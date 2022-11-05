@@ -22,7 +22,7 @@ jupyter:
 #### Brian Beckman
 
 
-#### 3 Nov 2022
+#### 4 Nov 2022
 
 
 # Prologue
@@ -152,22 +152,23 @@ That's it!
 Stop here if all you care about is a programming pattern for anonymousa recursive functions: just replace the business part -- `(... if ... else ...))` -- in both copies where it occurs, with your desired business code, and call your recursive function via the reusable self-application syntax `sf(sf)`. 
 
 
-However, there are worthwhile improvements. We can automate the programming pattern. We can write a general function $\mathscr{Y}$ that squares the square root of any function $\mathscr{F}$ and avoid all copy-paste code. That's a big deal! _Don't Repeat Yourself_ is a foundational principle of software engineering, a principle that avoids pitfalls in development and maintenance. 
+However, there are worthwhile improvements. We can automate the programming pattern. We can write a general function $\mathscr{Y}$ that squares the square root of any function $\mathscr{F}$. We can avoid all copy-paste code. That's a big deal! _Don't Repeat Yourself_ is a foundational principle of software engineering, a principle that avoids pitfalls in development and maintenance. 
 
 
 # Four Improvements: Two Abstractions, One Model, Packaging
 
 
-We have a square root $\sqrt{\mathscr{F}}$, that, when squared, produces the recursive ***domain function*** $\mathscr{F}$ of the ***domain parameters***. $\mathscr{F}$ does the real work we want. The domain function encapsulates -- returns -- the ***business function*** `(lambda n: ...)` that may refer to $\mathscr{F}$. 
+Let's make a ***combinator*** (a function of a function) that can convert any function into a new function that receives its self application, `f=sf(sf)`, as its first argument. This is a twist on the prior development. We want `sf(sf)` as the value of the first parameter `f`. We want to write `((...)(lambda f: (lambda n: ...))(6)` in our example, with `(lambda f: (lambda n: ...))` as the ***domain function*** `sf(sf)` and `(lambda n: ...)` as the ***business function***. Solve for `(...)`.
 
 
-Let's make a ***combinator*** (a function of a function) that can convert any function into a new function that receives its self application, `f=sf(sf)`, as its first argument. This is a twist on the prior development. We want `sf(sf)` as the value of the first parameter `f`. We want to write `((...)(lambda f: (lambda n: ...))(6)` in our example, with `(lambda f: (lambda n: ...))` as the domain function `sf(sf)` and `(lambda n: ...)` as the business function. Solve for `(...)`.
+First, start with the prior development, in which `sf` is the parameter in a cut-and-paste squaring of $\sqrt{\mathscr{F}}$. Inside the business code, replace `sf(sf)` by the parameter `f` of that new anonymous function of `f`, the domain function. Apply the new anonymous function of `f`  to `sf(sf)`. 
 
 
-First, start with the prior development, in which `sf` is the parameter in a cut-and-paste squaring of $\sqrt{\mathscr{F}}$. Inside the business code, replace `sf(sf)` by the parameter `f` of a new anonymous function of `f`, the domain function. Apply the new anonymous function of `f`  to `sf(sf)`. 
+> In general, ***abstraction*** means replacing an expression $\mathscr{E}$ with a parameter `e` of a new anonymous function, then applying that new anonymous function to $\mathscr{E}$ as an actual argument, which becomes the value of the parameter `e`. 
 
+> $\ldots\mathscr{E}\ldots\rightsquigarrow\texttt{(lambda e :}\ldots\texttt{e}\ldots\texttt{)}(\mathscr{E})$ 
 
-> That's what ***abstraction*** means in general: replacing an expression $\mathscr{E}$ with a parameter `e` of a new anonymous function, then applying that new function to $\mathscr{E}$ as an actual argument, which becomes the value of the parameter `e`. 
+> This is how, in general, you give actual but temporary names like `e` in your programming language to notional objects like $\mathscr{E}$ -- things you can write down spelled out in the programming language but can't give a name to, directly.
 
 
 Second, abstract the domain code into a parameter `d` of the final, general combinator $\mathscr{Y}$ (a notional name only) so that we write the domain code only once. 
@@ -189,14 +190,14 @@ The fragment on each line, below, is the new abstracted function of `f` applied 
 Why? Let's calculate. Let $\mathscr{s}\mathscr{F}$, notionally, stand for this function of `sf` that binds `sf(sf)` to the parameter `f`:
 
 ```python
-𝓈ℱ = (lambda sf: (lambda f: (lambda n: 1 if n < 1 else n * f(n - 1)))(sf(sf)))
+𝓈ℱ = ( lambda sf: (lambda f: (lambda n: 1 if n < 1 else n * f(n - 1)))(sf(sf)) )
 ```
 
 ```python
 𝓈ℱ
 ```
 
-So far, so good. Apply $\mathscr{s}\mathscr{F}$ -- this function of `sf` -- to a copy of itself exactly as before: 
+So far, so good, no blowing up! Apply $\mathscr{s}\mathscr{F}$ -- this function of `sf` -- to a copy of itself exactly as before: 
 
 ```python
 𝓈ℱ(𝓈ℱ)
@@ -205,10 +206,10 @@ So far, so good. Apply $\mathscr{s}\mathscr{F}$ -- this function of `sf` -- to a
 This can't work. The argument `sf(sf)` is evaluated to $\mathscr{s}\mathscr{F}\left(\mathscr{s}\mathscr{F}\right)$ before being bound to `f` , but there we go evaluating `sf(sf)` again before knowing what it is! 
 
 
-> That is ***applicative-order evaluation*** or ***call-by-value*** -- evaluate arguments before applying the function. It's the norm in most practical programming languages like Mathematica, Scheme, Python, C/C++, etc. It's too early for this job. An alternative is ***normal-order evaluation*** or ***call-by-name***.
+> That is ***applicative-order evaluation*** or ***call-by-value*** -- evaluate arguments before applying the function. It's the norm in most practical programming languages like Mathematica, Scheme, Python, C/C++, etc. It's too early for this job. 
 
 
-This unbounded recursion has nothing to do with the business code inside `(lambda f: ...)`; we never get there. The following has trivial business code:
+This unbounded recursion has nothing to do with the business code inside `(lambda f: ...)`; we never get there. The following has trivial business code and also blows up:
 
 ```python
 ((lambda sf: (lambda f: (lambda n: 0))(sf(sf)))
@@ -218,13 +219,13 @@ This unbounded recursion has nothing to do with the business code inside `(lambd
 ### Delay the Squaring
 
 
-Delay evaluation of `sf(sf)` by redefining $\mathscr{s}\mathscr{F}$ to apply, instead of `f`, 
+Delay evaluation of `sf(sf)` by redefining $\mathscr{s}\mathscr{F}$ to internally apply, instead of `f` to the numerical argument `n - 1`,
 
 ```python
 (lambda m: sf(sf)(m))
 ```
 
-to the numerical argument, as follows:
+as follows:
 
 ```python
 (lambda sf: 
@@ -233,13 +234,15 @@ to the numerical argument, as follows:
  (lambda m: sf(sf)(m))(n - 1))
 ```
 
-`(lambda m: sf(sf)(m))` always has the same value as `sf(sf)` when applied to any argument. The two expressions just evaluate `sf(sf)` at different times. In the first case, `sf(sf)` is evaluated later when `(lambda m: sf(sf)(m))` is applied to the argument `n`, substituting the value of `n` for the parameter `m`. 
+`(lambda m: sf(sf)(m))`$(\mathscr{N})$, always has the same value as `sf(sf)`$(\mathscr{N})$. The two expressions just evaluate `sf(sf)` at different times. In the first case, `sf(sf)` is evaluated later when `(lambda m: sf(sf)(m))` is applied to $\mathscr{N}$. The enclosing `lambda` means "_evaluate my guts later, when things might be better defined_." In the second case, `sf(sf)` is evaluated first, before being applied to $\mathscr{N}$, but that's too early.
 
 
-> This is a general technique for delaying the application of any function: replace the application with a function of some (any) parameter, the new function getting evaluated at the correct time. 
+> A general technique for delaying the application of any function: replace the application with a new function of some (any) parameter.
+
+> $f(n)\rightsquigarrow\left(\texttt{lambda m : }f(m)\right)\left(n\right)$
 
 
-> In lazy languages like Haskell, this step is automatic and implicit -- we don't write it -- because evaluatio is always delayed. That's similar to normal-order evaluation, maybe even equivalent.
+> In lazy languages like Haskell, this step is automatic and implicit -- we don't write it -- because evaluation is always delayed. That's similar to normal-order evaluation, maybe even equivalent.
 
 
 Let's back off and write our very first original self-application with `(lambda m: sf(sf)(m))` manually in place of `f`.
@@ -271,21 +274,21 @@ Now, as before, abstract `(lambda m: sf(sf)(m)`, merely a delayed version of `sf
 The abstraction on `f` now completely and minimally encloses the domain code :
 
 ```python
-𝒟 = (lambda f: (lambda n: 1 if n < 1 else n * f(n-1)))
+𝒟 = (lambda f: (lambda n: 1 if n < 1 else n * f(n - 1)))
 ```
 
-but that code is still copy-pasted. Abstract it:
+but $\mathscr{D}$ is still copy-pasted. Abstract it:
 
 
-1. Write a new function of a parameter `d` 
-2. with a body that replaces $\mathscr{D}$,the old function of `f`, with an application of `d`.
-3. Apply that new function of `d` to the old function of `f`
+1. Write a new function $\mathscr{H}$ of a parameter `d` ... 
+2. ... with a body that replaces $\mathscr{D}$, the old function of `f`, with `d`.
+3. Apply $\mathscr{H}$ of `d` to $\mathscr{D}$
 
 ```python
-((lambda d: 
+((lambda d:  # this is the new ℋ(d)
   (lambda sf: d(lambda m: sf(sf)(m)))
   (lambda sf: d(lambda m: sf(sf)(m))))
- (lambda f:  # this is 𝒟
+ (lambda f:  # this is the old 𝒟
   (lambda n: 1 if n < 1 else n * f(n - 1))))(6)
 ```
 
@@ -358,10 +361,10 @@ and test on our two examples
 # Static Types
 
 
-Temporarily forgetting about our one-shot server, let's write static types. Why? Because a compiler might generate fast code if it knew the types; and, because it's interesting. We leave the world of lambdas and enter the world of `def`.
+Let's write static types. Why? Because a compiler might generate fast code if it knew the types; and, because it's interesting. We leave the world of lambdas and enter the world of `def`, so we must temporarily forget about the one-shot server.
 
 
-## Domain Code: FI2I to FI2I
+## $\mathscr{D}$, Domain Code: FI2I to FI2I
 
 
 The busines code for factorial, `(lambda n: 1 if n < 1 ...)`, is a function from an integer `n` to an integer, a type that we call `FI2I`:
@@ -371,7 +374,7 @@ from typing import Callable
 FI2I = Callable[[int], int]  # int -> int
 ```
 
-> [Type aliases](https://docs.python.org/3.10/library/typing.html#type-aliases) might afford an improvement over the technique in this article.
+> [Type aliases](https://docs.python.org/3.10/library/typing.html#type-aliases) might improve on the technique in this article.
 
 
 The input to $\mathscr{Y}$ is $\mathscr{D}$, the _domain code_. $\mathscr{D}$ is a function of `f`. We have already deduced that `f` must be $\mathscr{F}$ = factorial, type `FI2I`. $\mathscr{D}$ takes a `FI2I`, `f`, and returns the business function, also of type `FI2I`. $\mathscr{D}$ must be of type `FI2I` $\rightarrow$ `FI2I`. Here is $\mathscr{D}$ for factorial:
@@ -414,7 +417,7 @@ def fibonacci_slow_domain_code(fib_slow: FI2I) -> FI2I:
 𝒴(fibonacci_slow_domain_code)(6)
 ```
 
-## Y: FI2I2FI2I to FI2I
+## $\mathscr{Y}$: FI2I2FI2I to FI2I
 
 
 We've established that $\mathscr{D}$ is of type `FI2I` $\rightarrow$ `FI2I`. Let's call that `FI2I2FI2I`
@@ -463,7 +466,7 @@ def self_apply(g: SQRT_FI2I) -> FI2I:
 The `delayed` function, which we previously wrote as `(lambda m: sf(sf)(m))`, takes an `int` and returns an `int`, so is of type `FI2I`. However, it refers to `sf` (it's a ***closure*** that _closes_ over `sf`), so we can't write it until we have a scope in which `sf` is defined. `delayed` can't take `sf` as a second parameter because all our functions take one parameter -- that's been an unwritten rule all along. 
 
 
-> One says such functions are ***Curried***, after Haskell Curry, the famous logician who gave his name to much of what we're talking about. 
+> One says that functions that take exactly one parameter are ***Curried***, after Haskell Curry, the famous logician who gave his name to much of what we're talking about. 
 
 
 ### LSF: SQRT_FI2I $\rightarrow$ FI2I
@@ -599,7 +602,7 @@ Writing types for lookup tables is more delicate. In a reversal of the prior dev
 from typing import Dict, Tuple
 ```
 
-Let `ASSOC` be the type of the lookup table. We'll pass instances of this type to the parameter `m`, paired with values in a type called `MEMO`:
+Let `ASSOC` be the type of the lookup table. We'll pass instances of this type to the parameter `m` for `MEMO`, paired with `int` values:
 
 ```python
 ASSOC = Dict[int, int]
@@ -608,8 +611,8 @@ MEMO = Tuple[ASSOC, int]
 
 The rest of the types are 
 1. `FIMEMO`, function from integer to memo
-2. `FAFIMEMO`, function from assoc to function of integer returning a memo
-3. `FAFIM2FAFIM`, function from a `FAFIMEMO` to a `FIFIMEMO`
+2. `FAFIMEMO`, function from assoc `A` to `int` $\rightarrow$ `MEMO`
+3. `FAFIM2FAFIM`, function from a `FAFIMEMO` to a `FAFIMEMO`
 4. `SQRT_FAFIMEMO`, function from `SQRT_FAFIMEMO`
 
 ```python
@@ -622,7 +625,7 @@ SQRT_FAFIMEMO = Callable[["SQRT_FAFIMEMO"], FAFIMEMO]
 ## Fast Fib Domain Code
 
 
-Except for the types, this is straightforward. It first checks the memo tables `a` and `a1` for presence of keys `n - 1` and `n - 2` via `in` expressions, and only calls the recursive function `f` when lookup fails. In that case, it updates the tables with new values so that recursive calls already on the stack can just look up results. It's best to analyze the types from the inside out, convincing ourselves that they can't be anything else.
+Except for the types, this is straightforward. It first checks the memo tables `a` and `a1` for presence of keys `n - 1` and `n - 2`,  via `in` expressions, then calls the recursive function `f` only when lookup fails. In that case, it updates the tables with new values so that recursive calls already on the stack can just look up results. It's best to analyze the types from the inside out, convincing ourselves that they can't be anything else.
 
 ```python
 def ff(f: FAFIMEMO) -> FAFIMEMO:
@@ -759,7 +762,7 @@ We'll show it at work, first, then explain how we derived it.
 Ok, I hope you're laughing at me, now. However, this is exactly the kind of expression we'd expect to see inside a Python compiler that converted the statement logic of `ff.fa.fn` into expressions. It's NOT just an intellectual exercise! It's a torture test for compilers. 
 
 
-However, it's practically impossible to get this absurd expression right without some mechanical help. For that help, I went to Clojure and Emacs which can close up parentheses easily. I hope you'll see that the following Clojure domain code is a straight transcription of the Python `ff.fa.fn` above. It was easy to write, though a little unnatural because of the Currying. I won't walk through it, but I'll show how it unpacks into the monster above.
+However, it's practically impossible to get this absurd expression right with fingers on the keyboard, without some kind of mechanical help. For that help, I went to Clojure and Emacs which balances parentheses easily. I hope you'll see that the following Clojure domain code is a straight transcription of the Python `ff.fa.fn` above. It was easy to write, though a little unnatural because of the Currying. I won't walk through it, but I'll show how it unpacks into the monster above.
 
 <!-- #raw -->
 (def dafib
@@ -786,3 +789,6 @@ However, it's practically impossible to get this absurd expression right without
 <!-- #endraw -->
 
 Python has no _let_ (except, see [this gist](https://gist.github.com/divs1210/d218d4b747b08751b2a232260321cdeb)). But `(let [x V] E)` is precisely `((lambda x: E)(V))`, and that's it, that's how we get all the nested lambdas.
+
+
+> The "_mechanical help_" that balances parentheses in Emacs is a nearly-miraculous thing called [paredit](https://emacsrocks.com/e14.html). I know of nothing even close elsewhere. I consider it sufficient reason to learn Emacs.
