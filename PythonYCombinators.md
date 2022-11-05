@@ -22,7 +22,7 @@ jupyter:
 #### Brian Beckman
 
 
-#### 31 Oct 2022
+#### 3 Nov 2022
 
 
 # Prologue
@@ -34,10 +34,10 @@ This is a Python version of the Mathematica notebook, [YCombinator005.nb](https:
 Though Python does not actually check static types, various tools like [mypy](http://mypy-lang.org/) and [PyCharm](https://www.jetbrains.com/pycharm/download/#section=mac) check them and produce warnings on errors.  
 
 
-The code in this notebook passes PyCharm's type-checking. It has two errors under mypy for two cyclic (recursive) type definitions. I do not know a way around this, but I don't consider it serious. After all, the entire topic "recursion." PyCharm's type checker evidently tolerates my recursive types. Also, there are new typing services in Python 3.10 that I might try later.
+The code in this notebook passes PyCharm's type-checking. It has two errors under mypy for two cyclic (recursive) type definitions. I do not know a way around this, but I don't consider it serious. After all, the entire topic is "recursion." PyCharm's type checker evidently tolerates my recursive types. Also, there are new typing services in Python 3.10 that I might try later.
 
 
-I present the theory in dynamically typed form, like the original Mathematica, then follow up with static types that can be compiled, say by [LPython](https://lpython.org).
+I present the dynamically-typed theory, like the original Mathematica, then follow up with static types that can be compiled, say by [LPython](https://lpython.org).
 
 
 # Introduction
@@ -46,7 +46,7 @@ I present the theory in dynamically typed form, like the original Mathematica, t
 Imagine a simplistic Python server that lets us evaluate expressions one at a time, but does not let us define functions or global variables. Why such restrictions? So that users can't fill up server memory with definitions in a putative denial-of-service attack.
 
 
-For an example, we'd like to compute the factorial of a certain number, say of 6, but the server doesn't offer a built-in for factorial. If we could define functions, we'd first send up
+For an example, I'd like to compute the factorial of a certain number, say 6, but the server doesn't offer a built-in for factorial. If I could define functions, I'd first send up
 
 ```python
 def factorial_recursive(n: int) -> int:
@@ -60,12 +60,12 @@ and then, later, send up
 factorial_recursive(6)
 ```
 
-But that's two shots, and we only get one shot. Are we out of luck? No. In fact, the following does the trick, as this article explains:
+But that's two shots, and I only get one shot. Am I out of luck? No. In fact, the following does the trick, as this article explains:
 
 ```python
 ((lambda d:
   (lambda g: g(g))
-  (lambda sf:  # <~~~ square roof of 'f'
+  (lambda sf:  # <~~~ square root of 'f'
    d(lambda m: (sf(sf))(m))))  # <~~~ ... sf squared
  (lambda f:
   (lambda n:         # v~~~ f at work
@@ -78,7 +78,7 @@ That's a flurry of symbols, I know, but this article makes it clear, I promise. 
 ## Bonus: Fast Fibonacci
 
 
-As a bonus, we'll show how to _memoize_ [sic] anonymous recursive functions to reduce their run-time complexity via [_dynamic programming_](https://en.wikipedia.org/wiki/Dynamic_programming).
+As a bonus, I show how to _memoize_ [sic] anonymous recursive functions to reduce their run-time complexity. Memoizing is a kind of [_dynamic programming_](https://en.wikipedia.org/wiki/Dynamic_programming).
 
 
 # Anonymous Functions
@@ -99,7 +99,7 @@ In the expression above, `x` is a _formal parameter_. It gets the value of its _
 ## Notation
 
 
-In the following, script letters like $\mathscr{D}$ , $\mathscr{E}$, $\mathscr{F}$, and $\mathscr{Y}$, are _notional names_: names we can't write for our one-shot Python server, but names of things we need to think about and don't want to keep writing out over and over. For example, we'll see the following over and over again:
+In the following, script letters like $\mathscr{D}$ , $\mathscr{E}$, $\mathscr{F}$, and $\mathscr{Y}$, are _notional names_: names we can't write for the one-shot Python server, but names of things we need to think about and don't want to keep writing out over and over again. For example, we'll see the following multiple times:
 
 <!-- #raw -->
 (lambda d:
@@ -108,19 +108,19 @@ In the following, script letters like $\mathscr{D}$ , $\mathscr{E}$, $\mathscr{F
   d(lambda m: (sf(sf))(m))))
 <!-- #endraw -->
 
-That's a literal, denotable expression that we'll send to our server as part of other expressions. But it's too much to look at while thinking, so we'll just call it $\mathscr{Y}$ for the sake of discussion. In fact, explaining $\mathscr{Y}$ is the whole point of this article. It's a gadget that passes the square of `sf` into domain code `d` for application. It pulls the square root magically out of a hat.
+That's a literal, denotable expression that we send to the server as part of other expressions. But it's too much to look at while thinking, so we just call it $\mathscr{Y}$ for the sake of discussion. In fact, explaining $\mathscr{Y}$ is the whole point of this article. It's a gadget that passes the delayed square of `sf` into domain code `d` for application. It pulls the square root magically out of a hat.
 
 
 # Recursion as Squaring the Square Root
 
 
-We want `fact`, but the server doesn't let us define or name `fact`. But the server _does_ let us define temporary names that go away in one shot: formal parameters of lambda expressions. So if we can name $\sqrt{\mathtt{fact}}$ as a parameter and then apply it to itself -- square it -- we get the same effect as `fact`. 
+We want `fact`, but the server doesn't let us define or name `fact`. But the server _does_ give us temporary names that go away in one shot: formal parameters of lambda expressions. So if we can name $\sqrt{\mathtt{fact}}$ as a parameter and then apply it to itself -- square it -- we get the same effect as `fact`. 
 
 
 More generally, for any function $\mathscr{F}$, pass $\sqrt{\mathscr{F}}$ as an actual argument to $\sqrt{\mathscr{F}}$. Bind the actual argument $\sqrt{\mathscr{F}}$ to the parameter `sf`. In the body of $\sqrt{\mathscr{F}}$, refer to $\mathscr{F}$ by the expression $\mathtt{sf(sf)}=\sqrt{\mathscr{F}}\left(\sqrt{\mathscr{F}}\right)=\left(\sqrt{\mathscr{F}}\right)^2= \mathscr{F}$. Square the square root by self-application to get the recursive function $\mathscr{F}$ that we want. What a great trick! 
 
 
-Turns out we can easily compute $\sqrt{\mathscr{F}}$ for any function $\mathscr{F}$. We do `fact` and `fib` as examples, then generalize. As a bonus, we'll speed up `fib`
+Turns out we can easily compute $\sqrt{\mathscr{F}}$ for any function $\mathscr{F}$. We do `fact` and `fib` as examples, then generalize. As a bonus, we speed up `fib` with a reusable technique.
 
 
 ## The Square Root of Factorial
@@ -133,10 +133,10 @@ To get the square root of factorial, just _assume it exists_ and has a name, `sf
  (lambda sf: (lambda n: 1 if n < 1 else n * sf(sf)(n - 1))))(6)
 ```
 
-> The technique of assuming something exists and then reasoning about its properties is as old as Pythagoras. The Pythagoreans discovered that $\sqrt{2}$, while the length of the hypotenuse of a right triangle with unit legs, is not a rational number, and they denied its existence, yet knowing its square. They were so appalled by this discovery that they instituted the death penalty for revealing it. It's possible that they executed [Hippasus](https://en.wikipedia.org/wiki/Hippasus) for revealing it. 
+> The technique of assuming something exists and then reasoning about its properties is as old as Pythagoras. The Pythagoreans discovered that $\sqrt{2}$, while the length of the hypotenuse of a right triangle with unit legs, is not a rational number, and they denied its existence, yet knowing its square. They were so appalled by this discovery that they instituted the death penalty for revealing it. It's possible that they executed [Hippasus](https://en.wikipedia.org/wiki/Hippasus) for revealing it. Similar stories surround the discoveries of 0, negative numbers, transcendental numbers, imaginary numbers, quaternions, and more. These were all disturbing violations of the prior known rules that only made sense through their implications. 
 
 
-Before the final actual argument, `6`, there is a lambda expression $\sqrt{\mathscr{F}}$=`(lambda sf: ...)` of one parameter `sf`
+Before the final actual argument, `6`, there is a lambda expression $\sqrt{\mathscr{F}}$=`(lambda sf: ...)` of one parameter `sf`. That lambda expression is
 applied to a cut-and-paste copy of its whole self. That self-application,  
 
 <!-- #raw -->
@@ -158,13 +158,10 @@ However, there are worthwhile improvements. We can automate the programming patt
 # Four Improvements: Two Abstractions, One Model, Packaging
 
 
-We have a square root $\sqrt{\mathscr{F}}$, that, when squared, produces the recursive ***domain function*** $\mathscr{F}$ of the ***domain parameters***. $\mathscr{F}$ does the real work we want. The domain function encapsulates -- returns -- the ***business function*** `(lambda n: ...)` that may refer to $\mathscr{F}$
+We have a square root $\sqrt{\mathscr{F}}$, that, when squared, produces the recursive ***domain function*** $\mathscr{F}$ of the ***domain parameters***. $\mathscr{F}$ does the real work we want. The domain function encapsulates -- returns -- the ***business function*** `(lambda n: ...)` that may refer to $\mathscr{F}$. 
 
 
-Let's make a ***combinator*** (a function of a function) that can convert any function into a new function that receives its self application, `f=sf(sf)`, as its first argument. This is a twist on the prior development. We want `sf(sf)` as the value of the first parameter `f`. We want to write `((...)(lambda f: (lambda n: ...))(6)` in our example, with `(lambda f: ...)` as the domain function `sf(sf)`, `(lambda n: ...)` as the business function. We must solve for `(...)`.
-
-
-Solve in two steps.
+Let's make a ***combinator*** (a function of a function) that can convert any function into a new function that receives its self application, `f=sf(sf)`, as its first argument. This is a twist on the prior development. We want `sf(sf)` as the value of the first parameter `f`. We want to write `((...)(lambda f: (lambda n: ...))(6)` in our example, with `(lambda f: (lambda n: ...))` as the domain function `sf(sf)` and `(lambda n: ...)` as the business function. Solve for `(...)`.
 
 
 First, start with the prior development, in which `sf` is the parameter in a cut-and-paste squaring of $\sqrt{\mathscr{F}}$. Inside the business code, replace `sf(sf)` by the parameter `f` of a new anonymous function of `f`, the domain function. Apply the new anonymous function of `f`  to `sf(sf)`. 
