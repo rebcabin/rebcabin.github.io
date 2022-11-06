@@ -101,12 +101,12 @@ In the expression above, `x` is a _formal parameter_. It gets the value of its _
 
 In the following, script letters like $\mathscr{D}$ , $\mathscr{E}$, $\mathscr{F}$, and $\mathscr{Y}$, are _notional names_: names we can't write for the one-shot Python server, but names of things we need to think about and don't want to keep writing out over and over again. For example, we'll see the following multiple times:
 
-<!-- #raw -->
-(lambda d:
- (lambda g: g(g))
- (lambda sf:
-  d(lambda m: (sf(sf))(m))))
-<!-- #endraw -->
+
+    (lambda d:
+     (lambda g: g(g))
+     (lambda sf:
+      d(lambda m: (sf(sf))(m))))
+
 
 That's a literal, denotable expression that we send to the server as part of other expressions. But it's too much to look at while thinking, so we just call it $\mathscr{Y}$ for the sake of discussion. In fact, explaining $\mathscr{Y}$ is the whole point of this article. It's a gadget that passes the delayed square of `sf` into domain code `d` for application. It pulls the square root magically out of a hat.
 
@@ -139,9 +139,9 @@ To get the square root of factorial, just _assume it exists_ and has a name, `sf
 Before the final actual argument, `6`, there is a lambda expression $\sqrt{\mathscr{F}}$=`(lambda sf: ...)` of one parameter `sf`. That lambda expression is
 applied to a cut-and-paste copy of its whole self. That self-application,  
 
-<!-- #raw -->
-((lambda sf: ...)(lambda sf: ...))
-<!-- #endraw -->
+
+    ((lambda sf: ...)(lambda sf: ...))
+
 
 squares $\sqrt{\mathscr{F}}$. Inside the recursive body -- inside the business part `(... if ... else ...)` -- there is a similar self-application, `sf(sf)`, applied to a numerical argument, `n - 1`. The external squaring, `((lambda sf: ...)(lambda sf: ...))` produces the same result as the internal squaring `sf(sf)`. 
 
@@ -300,10 +300,10 @@ We still have some copy-paste repetion. Let's get rid of it ...
 
 ... by abstraction again! Write a function `(lambda g: g(g))` that just self-applies any other function. Replace the self-application 
 
-<!-- #raw -->
-(lambda sf: d(lambda m: sf(sf)(m)))
-(lambda sf: d(lambda m: sf(sf)(m)))
-<!-- #endraw -->
+
+    (lambda sf: d(lambda m: sf(sf)(m)))
+    (lambda sf: d(lambda m: sf(sf)(m)))
+
 
 with an application of `(lambda g: g(g))` to `(lambda sf: d(lambda m: sf(sf)(m)))`:
 
@@ -579,7 +579,8 @@ Let's replace repeated evaluations with table lookups, approximately constant ti
 
 Currying makes it trivial to extend non-typed $\mathscr{Y}$ to any number of arguments.
 
-<!-- #raw -->
+
+```
 (lambda d:
  (lambda g: g(g))
  (lambda sf:
@@ -591,7 +592,8 @@ Currying makes it trivial to extend non-typed $\mathscr{Y}$ to any number of arg
    (lambda n:   # <~~~ ... more arguments
     -- business code that depends on f, m, n -- 
     )))
-<!-- #endraw -->
+```
+
 
 Writing types for lookup tables is more delicate. In a reversal of the prior development, we do the typed version first, then the untyped version.
 
@@ -764,7 +766,8 @@ Ok, I hope you're laughing at me, now. However, this is exactly the kind of expr
 
 However, it's practically impossible to get this absurd expression right with fingers on the keyboard, without some kind of mechanical help. For that help, I went to Clojure and Emacs which balances parentheses easily. I hope you'll see that the following Clojure domain code is a straight transcription of the Python `ff.fa.fn` above. It was easy to write, though a little unnatural because of the Currying. I won't walk through it, but I'll show how it unpacks into the monster above.
 
-<!-- #raw -->
+<!-- #region -->
+```clojure
 (def dafib
   (fn [f]
     (fn [a]   ;; an ASSOC :: int -> int
@@ -786,7 +789,8 @@ However, it's practically impossible to get this absurd expression right with fi
                         r2 (m2 1) ;; pick elt. 1 of m2
                         a2 (merge (m2 0) {n-2 r2})]
                     [a2, (+ r1 r2)]))))))))))
-<!-- #endraw -->
+```
+<!-- #endregion -->
 
 Python has no _let_ (except, see [this gist](https://gist.github.com/divs1210/d218d4b747b08751b2a232260321cdeb)). But `(let [x V] E)` is precisely `((lambda x: E)(V))`, and that's it, that's how we get all the nested lambdas.
 
