@@ -13,3 +13,7 @@
 - [Mathematica Notebook](https://github.com/rebcabin/rebcabin.github.io/blob/main/YCombinator005.nb)
 
 - [PDF of Mathematica Notebook](https://github.com/rebcabin/rebcabin.github.io/blob/main/YCombinator005.pdf)
+
+- [Lambda the Pynultimate Notebook](https://github.com/rebcabin/rebcabin.github.io/blob/main/LambdaThePynultimateImperative002.ipynb)
+
+- [Lambda the Pynultimate Markdown](https://github.com/rebcabin/rebcabin.github.io/blob/main/LambdaThePynultimateImperative002.md)
