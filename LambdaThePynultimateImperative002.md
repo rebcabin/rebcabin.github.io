@@ -124,6 +124,10 @@ If the definitions above are acceptable, the apparent contradiction in SICP is r
 
 > A frame $\phi$ belongs to a virtual sequence of environments implied by the unidirectional pointer-chain of enclosing environments rooted in $\phi$ and ending at the unique global environment. The ___value of a variable in an environment___ is the value in the first binding in any frame of that sequence. Bindings lower in the chain may ___shadow___ bindings higher in the chain, rendering them inaccessible. If no frame in a chain specifies a binding for the variable, then the variable is ___unbound___ in the environment. A variable may be ___bound___ in one environment and unbound in another.
 
++++
+
+Thanks to [divs1210](https://gist.github.com/divs1210?page=3) for the idea of assigning attributes to a dummy function object.
+
 ```{code-cell} ipython3
 from dataclasses import dataclass, field
 from types import FunctionType
@@ -245,7 +249,7 @@ DEFINE_PROC('saxpy', ['a', 'x', 'y'],
 APPLY(ΓΠ.saxpy, [4, 10, 2], ΓΠ)
 ```
 
-SICP 3.2.2
+### SICP 3.2.2
 
 ```{code-cell} ipython3
 DEFINE_PROC('square', ['x'], 
@@ -265,6 +269,12 @@ DEFINE_PROC('f', ['a'],
                   ΓΠ)
 
 APPLY(ΓΠ.f, [5], ΓΠ)
+```
+
+### Exercise 3.9
+
+```{code-cell} ipython3
+DEFINE_PROC()
 ```
 
 # Junkyard
