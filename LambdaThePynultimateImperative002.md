@@ -533,6 +533,28 @@ def LOOP3(d: Procedure) -> Procedure:
 LOOP3(ΓΠ.fact_iter)(1, 1, 6)  # <~~~ DON'T DO THIS, even though it works
 ```
 
+## Prove It
+
++++
+
+The recursive version blows Python's recursion limit.
+
+```{code-cell} ipython3
+try:
+    print(ΓΠ.Υ3(ΓΠ.fact_iter)(1, 1, 371))  # smallest that blows the limit
+except RecursionError as e:
+    print(e.args)
+```
+
+The tail-call version does not. Notice the domain code `fact_iter` is EXACTLY the same as in the recursive version above.
+
+```{code-cell} ipython3
+try:
+    print(LOOP3(ΓΠ.fact_iter)(1, 1, 371))
+except RecursionError as e:
+    print(e.args)
+```
+
 # Junkyard
 
 +++
