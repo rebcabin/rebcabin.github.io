@@ -98,7 +98,7 @@ We note in passing that this works only for a single thread. [Clojure, for insta
 
 +++
 
-$\pi$ is a nice pun: it evokes $\pi\eta\rho\iota$, a Gree prefix meaning "surrounding."
+$\pi$ is a nice pun: it evokes $\pi\eta\rho\iota$, a Greek prefix meaning "surrounding."
 
 +++
 
@@ -128,6 +128,10 @@ If the definitions above are acceptable, the apparent contradiction in SICP is r
 
 Thanks to [divs1210](https://gist.github.com/divs1210?page=3) for the idea of assigning attributes to a dummy function object.
 
++++
+
+We override `__getattr__` to avoid a separate function for recursive lookup. We can't also override `__setaddr__` to call `setattr(self.$\phi$ ...)` because `self.$\phi$` diverges on `getattr(self.$\phi$ ...)`.
+
 ```{code-cell} ipython3
 from dataclasses import dataclass, field
 from types import FunctionType
@@ -137,8 +141,8 @@ class Environment:
     attributes, it's ok to omit the ϕ."""
     ϕ: FunctionType   # "frame," also nice place to hang attributes via 'setattr'
     π: "Environment"  # via Greek πηρι, short name for 'enclosing'
-    # Recursive lookup
     def __getattr__(self, key):
+        """recursive lookup"""
         try:
             result = getattr(self.ϕ, key)
         except AttributeError as _:
@@ -147,6 +151,10 @@ class Environment:
             else:  # recurse
                 result = self.π.__getattr__(key)
         return result
+# diverges because it calls __getattr__ for 'self.ϕ'
+#    def __setattr__(self, key, val):
+#        setattr(getattr(self, 'ϕ'), key, val)
+#        setattr(self.ϕ, key, val)
 # The ugliness of 'setattr' is hidden in DEFINE and DEFINE_PROC.
     
 ΓΠ = Environment(lambda: None, None)  # Γ for "global," Π for "environment"
@@ -158,18 +166,30 @@ setattr(ΓΠ.ϕ, 'γόὂ', 43)
 
 +++
 
-A ___procedure___ is a pair of code and environment. ___Code___ is a dictionary of parameter names and a $\lambda$ expression. The $\lambda$, by convention, takes a sigle argument, the environment in which its formal parameters are bound via some application of the procedure, as described in SICP 3.2. This convention seems to be the best we can do for composable $\lambda$s in Schemulator. For now, we support only positional arguments, one-to-one with the argument list. That's consistent with [Gambit Scheme](https://github.com/gambit/gambit), which reports "Wrong number of arguments ..." if the application has too many or too few arguments.
+A ___procedure___ is a pair of code and environment. ___Code___ is a dictionary of parameter names and a $\lambda$ expression. The $\lambda$, by convention, takes a sigle argument, $\pi$, the environment in which its formal parameters are bound to actual arguments via some application of the procedure, as described in SICP 3.2. This convention seems to be the best we can do for composable $\lambda$s in Schemulator. For now, we support only positional arguments, one-to-one with the argument list. That's consistent with [Gambit Scheme](https://github.com/gambit/gambit), which reports "Wrong number of arguments ..." if the application has too many or too few arguments.
+
++++
+
+Experimental: `__getitem__` call syntax.
 
 ```{code-cell} ipython3
-from typing import Dict, List
+from typing import Dict, List, Tuple
 Parameters = List[str]  # positional arguments only
+def APPLY(proc, args, π):
+    """forward reference; Will be redefined."""
+    print(args)
 @dataclass
 class Procedure:
     code: Dict
     π: Environment
+    def __getitem__(self, keys):
+        if isinstance(keys, List) or isinstance(keys, Tuple):
+            return APPLY(self, keys, self.π)
+        else:
+            return APPLY(self, [keys], self.π)
 ```
 
-Following the example for _square_ in SICP 3.2.1, let's define it in the global environment:
+Following the example for _square_ in SICP 3.2.1, let's define it in the global environment and test the invocation of `APPLY`:
 
 ```{code-cell} ipython3
 setattr(
@@ -179,6 +199,8 @@ setattr(
         {"body": lambda π: π.x * π.x,  # ugly, I know; sorry :(
          "parameters": ['x']}, 
         ΓΠ))
+ΓΠ.square[5]
+ΓΠ.square[5, 6]
 ```
 
 ## EVAL
@@ -190,10 +212,13 @@ work in progress
 ```{code-cell} ipython3
 from typing import Any
 def EVAL(expr: Any, π: Environment) -> Any:
+    """Python does almost all this for us."""
     if isinstance(expr, int) or \
        isinstance(expr, float) or \
        isinstance(expr, str) or \
        isinstance(expr, bool):
+        result = expr
+    elif isinstance(expr, Procedure):
         result = expr
     else:
         raise ValueError
@@ -207,9 +232,10 @@ class IllegalArgumentsError(ValueError):
     pass
 
 def APPLY(proc: Procedure, args: List[Any], π:Environment) -> Any:
+    """How about a nice __getitem__ overload on 'Procedure' for this."""
     if len(proc.code['parameters']) != len(args):
         raise IllegalArgumentsError(
-            f"Wrong number of arguments passed to procedure {proc_str}")
+            f"Wrong number of arguments passed to procedure {proc}")
     evaled_args = [EVAL(arg, π) for arg in args]
     E1 = Environment(lambda: None, π)
     for k, v in zip(proc.code['parameters'], evaled_args):
@@ -217,7 +243,41 @@ def APPLY(proc: Procedure, args: List[Any], π:Environment) -> Any:
     result = proc.code['body'](E1)
     return result
     
-APPLY(ΓΠ.square, [5], ΓΠ)
+print(APPLY(ΓΠ.square, [5], ΓΠ))
+```
+
+Square-bracket notation (like Wolfram / Mathematica) works
+
+```{code-cell} ipython3
+print(ΓΠ.square[5])
+```
+
+Works on anonymous procedures, too:
+
+```{code-cell} ipython3
+print(
+    Procedure(code={
+        "body": lambda π: π.x * π.x, 
+        "parameters": ['x']}, π=ΓΠ)
+    [5])
+```
+
+procedures that return procedures:
+
+```{code-cell} ipython3
+print('f' in dir(ΓΠ.ϕ))
+# λ d: (λ g: g(g))(λ sf: d[λ m: sf[sf][m]]) from 
+Procedure(code={"body":
+               parameters: ['d']})
+Procedure(code={"body": 
+                lambda π: 
+                Procedure(code={"body": lambda π: 
+                                π.product if π.counter > π.max_count else \
+                                π.f[π.counter * π.product, π.counter + 1, π.max_count],
+                                "parameters": ['product', 'counter', 'max_count']}, π=π),
+                "parameters": ['f']}, π=ΓΠ)
+
+#    [1, 1, 6], π=ΓΠ)
 ```
 
 ## DEFINE
@@ -246,7 +306,7 @@ DEFINE_PROC('saxpy', ['a', 'x', 'y'],
             lambda π: π.a * π.x + π.y, 
             ΓΠ)  # ugly, i know; sorry :(
 
-APPLY(ΓΠ.saxpy, [4, 10, 2], ΓΠ)
+ΓΠ.saxpy[4, 10, 2]
 ```
 
 ### SICP 3.2.2
@@ -258,23 +318,98 @@ DEFINE_PROC('square', ['x'],
 
 DEFINE_PROC('sum_of_squares', ['x', 'y'],
            lambda π: \
-            APPLY(π.square, [π.x], π) + \
-            APPLY(π.square, [π.y], π),
+            π.square[π.x] + π.square[π.y],
            ΓΠ)
 
 DEFINE_PROC('f', ['a'],
            lambda π: \
-            APPLY(π.sum_of_squares, 
-                  [1 + π.a, 2 * π.a], π), 
-                  ΓΠ)
+            π.sum_of_squares[1 + π.a, 2 * π.a],
+            ΓΠ)
 
-APPLY(ΓΠ.f, [5], ΓΠ)
+ΓΠ.f[5]
 ```
 
 ### Exercise 3.9
 
 ```{code-cell} ipython3
-DEFINE_PROC()
+DEFINE_PROC('factorial', ['n'],
+           lambda π: 1 if π.n < 2 else \
+            π.n * π.factorial[π.n - 1],
+           ΓΠ)
+
+ΓΠ.factorial[6]
+```
+
+This doesn't tail-recurse because Python does not tail-recurse. See [Tail Recursion](#tail-recursion) for mitigation work-in-progress.
+
+```{code-cell} ipython3
+DEFINE_PROC('fact_iter', ['product', 'counter', 'max_count'],
+           lambda π: π.product if π.counter > π.max_count else \
+           π.fact_iter[
+               π.counter * π.product,
+               π.counter + 1,
+               π.max_count
+           ], ΓΠ)
+
+ΓΠ.fact_iter[1, 1, 6]
+```
+
+# Tail Recursion<a id="tail-recursion"></a>
+
++++
+
+Thanks to [Thomas Baruchel for this idea on tail recursion](https://stackoverflow.com/questions/13591970/does-python-optimize-tail-recursion). The input function must have the form of [_domain code_ as explained in this notebook](https://github.com/rebcabin/rebcabin.github.io/blob/main/PythonYCombinators.ipynb), i.e., `lambda f: lambda args: ...`. This isn't Scheme proper, but it's akin to Clojure, where the user must explicitly write `loop` and `recur`, presumably implemented quite like this.
+
+```{code-cell} ipython3
+class RecursiveCall(Exception):
+    def __init__(self, *args):
+        self.args = args
+
+def RECUR(*args):
+    raise RecursiveCall(*args)
+
+def bet0(func):
+    def recursor(*args):
+        raise RecursiveCall(*args)
+    
+    def wrapper(*args):
+        while True:
+            try:
+                return func(RECUR)(*args)
+            except RecursiveCall as e:
+                args = e.args
+    return wrapper
+
+bet0(lambda f: lambda product, counter, max_count: \
+     product if counter > max_count else \
+     f(counter * product, counter + 1, max_count))(1, 1, 6)
+
+DEFINE(
+    'fact_iter_tail_recursive', 
+    ['product', 'counter', 'max_count'],
+    
+```
+
+```{code-cell} ipython3
+def bet0(func):
+    class RecursiveCall(Exception):
+        def __init__(self, *args):
+            self.args = args
+
+    def recursor(*args):
+        raise RecursiveCall(*args)
+    
+    def wrapper(*args):
+        while True:
+            try:
+                return func(recursor)(*args)
+            except RecursiveCall as e:
+                args = e.args
+    return wrapper
+
+bet0(lambda f: lambda product, counter, max_count: \
+     product if counter > max_count else \
+     f(counter * product, counter + 1, max_count))(1, 1, 6)
 ```
 
 # Junkyard
