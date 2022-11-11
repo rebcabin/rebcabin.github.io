@@ -36,7 +36,7 @@ In a classic paper, [_Lambda, the Ultimate Imperative_](https://www.researchgate
 
 It's useful to recap this paper in Python, which has most of the listed imperative constructs. Imagine compiling Python into an intermediate language in which the semantics, even those with side-effects, are laid bare as trees of $\lambda$ expressions. In such a representation, optimizations are 
 1. easy to write as tree-to-tree transforms
-1. easy to extend via just function composition
+1. easy to extend via just function composition (even Kleisli-monadic)
 2. independent of surface syntax, thus easy to share with other imperative languages like Fortran, C, Java
 3. independent of back ends, thus easy to run interactively; or to translate into LLVM, x86, ARM64, C, for execution; or to transpile into other surface languages
 
@@ -45,7 +45,7 @@ It's useful to recap this paper in Python, which has most of the listed imperati
 The use-cases above are similar to those for a SQL algebraizer. Many SQL implementations 
 1. translate the surface language into bare-bones expressions in a closed relational algebra, free of original syntax
 2. run the algebraic expressions through symbolic optimizers, which often rearrange the expressions completely
-2. incrementally extend the system by composing new optimization
+2. incrementally extend the system by composing new optimizations
 3. translate optimized expressions into commands for local and distributed servers
 
 +++
@@ -162,7 +162,8 @@ from types import FunctionType
 @dataclass
 class Environment:
     """Set attributes via settattr(env.ϕ, key, val). When getting
-    attributes, it's ok to omit the ϕ."""
+    attributes, it's ok to omit the ϕ because of overloaded 
+    __getattr__."""
     ϕ: FunctionType   # "frame," also nice place to hang attributes via 'setattr'
     π: "Environment"  # via Greek πηρι, short name for 'enclosing'
     def __getattr__(self, key):
@@ -179,7 +180,7 @@ class Environment:
 #    def __setattr__(self, key, val):
 #        setattr(getattr(self, 'ϕ'), key, val)
 #        setattr(self.ϕ, key, val)
-# The ugliness of 'setattr' is hidden in DEFINE and DEFINE_PROC.
+# The ugliness of 'setattr' is hidden in DEFINE.
     
 ΓΠ = Environment(lambda: None, None)  # Γ for "global," Π for "environment"
 setattr(ΓΠ.ϕ, 'γόὂ', 43)
@@ -196,10 +197,6 @@ A ___procedure___ is a pair of code and environment. ___Code___ is a dictionary 
 
 By default, procedures are defined in the unique global environment, $\Gamma\Pi$.
 
-+++
-
-Experimental: `__getitem__` call syntax.
-
 ```{code-cell} ipython3
 from typing import Dict, List, Tuple
 Parameters = List[str]  # positional arguments only
@@ -208,16 +205,18 @@ def APPLY(proc, args, π=ΓΠ):
     print(args)
 @dataclass
 class Procedure:
-    code: Dict
+    code: Dict  # TODO: Check for duplicated symbols in `parameters`.
     π: Environment=ΓΠ  # Defined in global environment by default.
+    
     def __getitem__(self, keys):
         if isinstance(keys, List) or isinstance(keys, Tuple):
             return APPLY(self, keys, self.π)
         else:
             return APPLY(self, [keys], self.π)
-# experimental:
-#    def __call__(self, *args):
-#        return APPLY(self, args, self.π)
+
+    def __call__(self, *args):
+        """experimental"""
+        return APPLY(self, args, self.π)
 ```
 
 Following the example for _square_ in SICP 3.2.1, let's define it in the global environment and test the invocation of `APPLY`:
@@ -231,8 +230,8 @@ setattr(
          "parameters": ['x']}))
 ΓΠ.square[5]
 ΓΠ.square[5, 6]
-#ΓΠ.square(5)
-#ΓΠ.square(5, 6)
+ΓΠ.square(5)
+ΓΠ.square(5, 6)
 ```
 
 ## $\Lambda$
@@ -243,9 +242,10 @@ Some syntactical help for anonymous procedures:
 
 ```{code-cell} ipython3
 def Λ(body, parameters, π=ΓΠ):
-    return Procedure(code={
-        "body": body, "parameters": parameters}, 
-              π=π)
+    result = Procedure(
+        code={"body": body, "parameters": parameters}, 
+        π=π)
+    return result
 ```
 
 ```{code-cell} ipython3
@@ -310,10 +310,16 @@ Square-bracket notation (like Wolfram / Mathematica) works:
 ΓΠ.square[5]
 ```
 
+So do "Pythonic" round brackets. We had to make them work for [tail recursion](#tail-recursion).
+
+```{code-cell} ipython3
+ΓΠ.square(5)
+```
+
 Works on anonymous procedures, too:
 
 ```{code-cell} ipython3
-Λ(lambda π: π.x * π.x, ['x'])[5]
+Λ(lambda π: π.x * π.x, ['x'])(5)
 ```
 
 ## DEFINE
@@ -335,7 +341,7 @@ def DEFINE(sym: str, val: Any, π: Environment=ΓΠ) -> None:
 DEFINE('saxpy', 
        Λ(lambda π: π.a * π.x + π.y, ['a', 'x', 'y']))
 
-ΓΠ.saxpy[4, 10, 2]
+ΓΠ.saxpy(4, 10, 2)
 ```
 
 ### SICP 3.2.2
@@ -345,12 +351,12 @@ DEFINE('square',
        Λ(lambda π: π.x * π.x, ['x']))
 
 DEFINE('sum_of_squares',
-       Λ(lambda π: π.square[π.x] + π.square[π.y], ['x', 'y']))
+       Λ(lambda π: π.square(π.x) + π.square(π.y), ['x', 'y']))
 
 DEFINE('f',
-       Λ(lambda π: π.sum_of_squares[1 + π.a, 2 * π.a], ['a']))
+       Λ(lambda π: π.sum_of_squares(1 + π.a, 2 * π.a), ['a']))
 
-ΓΠ.f[5]
+ΓΠ.f(5)
 ```
 
 ### Exercise 3.9
@@ -358,9 +364,9 @@ DEFINE('f',
 ```{code-cell} ipython3
 DEFINE('factorial',
        Λ(lambda π: 1 if π.n < 2 else \
-         π.n * π.factorial[π.n - 1], ['n']))
+         π.n * π.factorial(π.n - 1), ['n']))
 
-ΓΠ.factorial[6]
+ΓΠ.factorial(6)
 ```
 
 This doesn't tail-recurse because Python does not tail-recurse. See [Tail Recursion](#tail-recursion) for mitigation work-in-progress.
@@ -368,43 +374,43 @@ This doesn't tail-recurse because Python does not tail-recurse. See [Tail Recurs
 ```{code-cell} ipython3
 DEFINE('fact_iter',
        Λ(lambda π: π.product if π.counter > π.max_count else \
-         π.fact_iter[
+         π.fact_iter(
            π.counter * π.product,
            π.counter + 1,
            π.max_count
-           ], ['product', 'counter', 'max_count']))
+           ), ['product', 'counter', 'max_count']))
 
-ΓΠ.fact_iter[1, 1, 6]
+ΓΠ.fact_iter(1, 1, 6)
 ```
 
 ## Procedures that Apply Procedures
 
 ```{code-cell} ipython3
-Λ(lambda π: π.f[π.x],['f', 'x'])[ΓΠ.square, 42]
+Λ(lambda π: π.f(π.x),['f', 'x'])(ΓΠ.square, 42)
 ```
 
 Anonymously; shadowing is no problem, here:
 
 ```{code-cell} ipython3
-Λ(lambda π: Λ(lambda π: π.n * π.n, ['n'], π)[π.n], ['n'])[42]
+Λ(lambda π: Λ(lambda π: π.n * π.n, ['n'], π)(π.n), ['n'])(42)
 ```
 
 But you had better include the non-default $\pi$ on the inner if you don't want accidentally the correct answer.
 
 ```{code-cell} ipython3
-Λ(lambda π: Λ(lambda π: π.x * π.n, ['x'], π)[π.n], ['n'])[42]
+Λ(lambda π: Λ(lambda π: π.x * π.n, ['x'], π)(π.n), ['n'])(42)
 ```
 
 ## Procedures that Return Procedures
 
 ```{code-cell} ipython3
-Λ(lambda π: π.f, ['f'])[ΓΠ.square][42]
+Λ(lambda π: π.f, ['f'])(ΓΠ.square)(42)
 ```
 
 Anonymously:
 
 ```{code-cell} ipython3
-Λ(lambda π: π.f, ['f'])[Λ(lambda π: π.x * π.x, ['x'])][42]
+Λ(lambda π: π.f, ['f'])(Λ(lambda π: π.x * π.x, ['x']))(42)
 ```
 
 ## Square Roots of Functions
@@ -419,9 +425,9 @@ Don't forget non-default $\pi$ on the inner lest `sf` be undefined.
 
 ```{code-cell} ipython3
 Λ(lambda π: 
-  Λ(lambda π: 1 if π.n < 1 else π.n * π.sf[π.sf][π.n - 1], ['n'], π), ['sf'])[
+  Λ(lambda π: 1 if π.n < 1 else π.n * π.sf(π.sf)(π.n - 1), ['n'], π), ['sf'])[
     Λ(lambda π: 
-      Λ(lambda π: 1 if π.n < 1 else π.n * π.sf[π.sf][π.n - 1], ['n'], π), ['sf'])][6]
+      Λ(lambda π: 1 if π.n < 1 else π.n * π.sf(π.sf)(π.n - 1), ['n'], π), ['sf'])](6)
 ```
 
 Abstract into a $\lambda$ of `m` a $\lambda$-delayed self-application of `sf`:
@@ -429,29 +435,29 @@ Abstract into a $\lambda$ of `m` a $\lambda$-delayed self-application of `sf`:
 ```{code-cell} ipython3
 Λ(lambda π: 
   Λ(lambda π: 
-    Λ(lambda π: 1 if π.n < 1 else π.n * π.f[π.n - 1], ['n'], π), 
-    ['f'], π)[Λ(lambda π: π.sf[π.sf][π.m], ['m'], π)], 
+    Λ(lambda π: 1 if π.n < 1 else π.n * π.f(π.n - 1), ['n'], π), 
+    ['f'], π)[Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)], 
   ['sf'])[
 Λ(lambda π: 
   Λ(lambda π: 
-    Λ(lambda π: 1 if π.n < 1 else π.n * π.f[π.n - 1], ['n'], π), 
-    ['f'], π)[Λ(lambda π: π.sf[π.sf][π.m], ['m'], π)], 
-  ['sf'])][6]
+    Λ(lambda π: 1 if π.n < 1 else π.n * π.f(π.n - 1), ['n'], π), 
+    ['f'], π)[Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)], 
+  ['sf'])](6)
 ```
 
 Abstract into `d` the _domain code_, a function of `f`, the _business code_, a function of `n`, the _busieness parameter_.
 
 ```{code-cell} ipython3
 Λ(lambda π: # of d
-  Λ(lambda π: π.d[Λ(lambda π: π.sf[π.sf][π.m], ['m'], π)],
+  Λ(lambda π: π.d[Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)],
     ['sf'], π)[
-      Λ(lambda π: π.d[Λ(lambda π: π.sf[π.sf][π.m], ['m'], π)],
+      Λ(lambda π: π.d[Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)],
         ['sf'], π)], 
   ['d'])[
     Λ(lambda π: # of f
-      Λ(lambda π: 1 if π.n < 1 else π.n * π.f[π.n - 1], ['n'], π), 
+      Λ(lambda π: 1 if π.n < 1 else π.n * π.f(π.n - 1), ['n'], π), 
       ['f'])
-][6]
+](6)
 ```
 
 Abstract into `g` the self-application of the function of the square root, the function of `sf`.
@@ -459,13 +465,13 @@ Abstract into `g` the self-application of the function of the square root, the f
 ```{code-cell} ipython3
 Λ(lambda π: # of d
   Λ(lambda π: π.g[π.g], ['g'], π)[
-      Λ(lambda π: π.d[Λ(lambda π: π.sf[π.sf][π.m], ['m'], π)],
+      Λ(lambda π: π.d[Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)],
         ['sf'], π)], 
   ['d'])[
     Λ(lambda π: # of f
-      Λ(lambda π: 1 if π.n < 1 else π.n * π.f[π.n - 1], ['n'], π), 
+      Λ(lambda π: 1 if π.n < 1 else π.n * π.f(π.n - 1), ['n'], π), 
       ['f'])
-][6]
+](6)
 ```
 
 ## Iterative Factorial via $\Upsilon$
@@ -478,9 +484,9 @@ The thing that looks like "Y" below is actually capital Upsilon ($\Upsilon$ in $
 # λ d: (λ g: g[g])(λ sf: d[λ m, c, x: sf[sf][m, c, x]]) 
 DEFINE('Υ3', 
        Λ(lambda π: # of d, the domain code
-         Λ(lambda π: π.g[π.g], ['g'], π)[
-           Λ(lambda π: π.d[Λ(lambda π: π.sf[π.sf][π.m, π.c, π.x], 
-                   ['m', 'c', 'x'], π)], 
+         Λ(lambda π: π.g(π.g), ['g'], π)[
+           Λ(lambda π: π.d(Λ(lambda π: π.sf(π.sf)(π.m, π.c, π.x), 
+                   ['m', 'c', 'x'], π)), 
              ['sf'], π)], 
          ['d']));
 ```
@@ -496,7 +502,7 @@ User-level domain code, redefining `fact_iter`. Any domain code is a function of
 DEFINE('fact_iter', # domain code ...
        Λ(lambda π: # ... function of f, which is business code.
          Λ(lambda π: π.m if π.c > π.x else 
-           π.f[π.m * π.c, π.c + 1, π.x], # business code
+           π.f(π.m * π.c, π.c + 1, π.x), # business code
            ['m', 'c', 'x'], π), # business parameters
          ['f']));
 ```
@@ -516,74 +522,30 @@ Thanks to [Thomas Baruchel for this idea on tail recursion](https://stackoverflo
 The thing that looks like "P" below is Greek Capital Rho for "recur" and "B" is Greek Capital Beta for "Baruchel." B has the same signature as $\Upsilon$; it takes a _domain code_ as its sole argument. Names in user code should not collide with P and B if users remember that they should [avoid Greek in user code](#greek). As with $\Upsilon$, Rho must know its number of arguments. That's OK for now (TODO: reconsider).
 
 ```{code-cell} ipython3
-class TailCall(Exception):  # αναδρομική_κλήση
+class TailCall(Exception):  
+    """αναδρομική κλήση"""
     def __init__(self, *args):
         self.args = args
 
-def RECUR(*args):  # υψώνω
+def RECUR(*args):  
+    """υψώνω: in sincere flattery of Clojure"""
     raise TailCall(*args)
 
-DEFINE('Ρ3', Λ(lambda π: 0, ['m', 'c', 'x']))
+DEFINE('Ρ3', Λ(lambda π: RECUR(π.m, π.c, π.x), ['m', 'c', 'x']))
         
-def bet0(func):
-    def recursor(*args):
-        raise RecursiveCall(*args)
-    
-    def wrapper(*args):
+def LOOP3(d: Procedure) -> Procedure:
+    """in sincere flattery of Clojure"""
+    def looper(*args):
+        """Expression form of a while-loop statement."""
         while True:
-            try:
-                return func(RECUR)(*args)
+            try: 
+                return d(ΓΠ.Ρ3)(*args)  # experimental 'call' syntax
             except TailCall as e:
                 args = e.args
-    return wrapper
+    result = Λ(lambda π: looper(π.m, π.c, π.x), ['m', 'c', 'x'], π=d.π)
+    return result
 
-bet0(lambda f: lambda m, c, x: \
-     m if c > x else \
-     f(c * m, c + 1, x))(1, 1, 6)
-```
-
-```{code-cell} ipython3
-class TailCall(Exception):
-    def __init__(self, *args):
-        self.args = args
-        
-def RECUR(*args):
-    raise TailCall(*args)
-
-def bet0(func):
-    def wrapper(*args):
-        while True:
-            try:
-                return func(RECUR)(*args)
-            except TailCall as e:
-                args = e.args
-    return wrapper
-
-bet0(lambda f: lambda product, counter, max_count: \
-     product if counter > max_count else \
-     f(counter * product, counter + 1, max_count))(1, 1, 6)    
-```
-
-```{code-cell} ipython3
-def bet0(func):
-    class RecursiveCall(Exception):
-        def __init__(self, *args):
-            self.args = args
-
-    def recursor(*args):
-        raise RecursiveCall(*args)
-    
-    def wrapper(*args):
-        while True:
-            try:
-                return func(recursor)(*args)
-            except RecursiveCall as e:
-                args = e.args
-    return wrapper
-
-bet0(lambda f: lambda product, counter, max_count: \
-     product if counter > max_count else \
-     f(counter * product, counter + 1, max_count))(1, 1, 6)
+LOOP3(ΓΠ.fact_iter)(1, 1, 6)  # <~~~ DON'T DO THIS, even though it works
 ```
 
 # Junkyard
