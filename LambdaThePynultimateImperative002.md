@@ -207,13 +207,6 @@ def APPLY(proc, args, π=ΓΠ):
 class Procedure:
     code: Dict  # TODO: Check for duplicated symbols in `parameters`.
     π: Environment=ΓΠ  # Defined in global environment by default.
-    
-    def __getitem__(self, keys):
-        if isinstance(keys, List) or isinstance(keys, Tuple):
-            return APPLY(self, keys, self.π)
-        else:
-            return APPLY(self, [keys], self.π)
-
     def __call__(self, *args):
         """experimental"""
         return APPLY(self, args, self.π)
@@ -228,8 +221,6 @@ setattr(
     Procedure(
         {"body": lambda π: π.x * π.x,  # ugly, I know; sorry :(
          "parameters": ['x']}))
-ΓΠ.square[5]
-ΓΠ.square[5, 6]
 ΓΠ.square(5)
 ΓΠ.square(5, 6)
 ```
@@ -253,8 +244,8 @@ setattr(
     ΓΠ.ϕ,
     "square",
     Λ(lambda π: π.x * π.x, ['x']))
-ΓΠ.square[5]
-ΓΠ.square[5, 6]
+ΓΠ.square(5)
+ΓΠ.square(5, 6)
 ```
 
 ## EVAL
@@ -304,13 +295,7 @@ def APPLY(proc: Procedure, args: List[Any], π:Environment=ΓΠ) -> Any:
 print(APPLY(ΓΠ.square, [5]))
 ```
 
-Square-bracket notation (like Wolfram / Mathematica) works:
-
-```{code-cell} ipython3
-ΓΠ.square[5]
-```
-
-So do "Pythonic" round brackets. We had to make them work for [tail recursion](#tail-recursion).
+Call via "Pythonic" round brackets:
 
 ```{code-cell} ipython3
 ΓΠ.square(5)
@@ -425,9 +410,9 @@ Don't forget non-default $\pi$ on the inner lest `sf` be undefined.
 
 ```{code-cell} ipython3
 Λ(lambda π: 
-  Λ(lambda π: 1 if π.n < 1 else π.n * π.sf(π.sf)(π.n - 1), ['n'], π), ['sf'])[
+  Λ(lambda π: 1 if π.n < 1 else π.n * π.sf(π.sf)(π.n - 1), ['n'], π), ['sf'])(
     Λ(lambda π: 
-      Λ(lambda π: 1 if π.n < 1 else π.n * π.sf(π.sf)(π.n - 1), ['n'], π), ['sf'])](6)
+      Λ(lambda π: 1 if π.n < 1 else π.n * π.sf(π.sf)(π.n - 1), ['n'], π), ['sf']))(6)
 ```
 
 Abstract into a $\lambda$ of `m` a $\lambda$-delayed self-application of `sf`:
@@ -436,42 +421,42 @@ Abstract into a $\lambda$ of `m` a $\lambda$-delayed self-application of `sf`:
 Λ(lambda π: 
   Λ(lambda π: 
     Λ(lambda π: 1 if π.n < 1 else π.n * π.f(π.n - 1), ['n'], π), 
-    ['f'], π)[Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)], 
-  ['sf'])[
+    ['f'], π)(Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)), 
+  ['sf'])(
 Λ(lambda π: 
   Λ(lambda π: 
     Λ(lambda π: 1 if π.n < 1 else π.n * π.f(π.n - 1), ['n'], π), 
-    ['f'], π)[Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)], 
-  ['sf'])](6)
+    ['f'], π)(Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)), 
+  ['sf']))(6)
 ```
 
 Abstract into `d` the _domain code_, a function of `f`, the _business code_, a function of `n`, the _busieness parameter_.
 
 ```{code-cell} ipython3
 Λ(lambda π: # of d
-  Λ(lambda π: π.d[Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)],
-    ['sf'], π)[
-      Λ(lambda π: π.d[Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)],
-        ['sf'], π)], 
-  ['d'])[
+  Λ(lambda π: π.d(Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)),
+    ['sf'], π)(
+      Λ(lambda π: π.d(Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)),
+        ['sf'], π)), 
+  ['d'])(
     Λ(lambda π: # of f
       Λ(lambda π: 1 if π.n < 1 else π.n * π.f(π.n - 1), ['n'], π), 
       ['f'])
-](6)
+    )(6)
 ```
 
 Abstract into `g` the self-application of the function of the square root, the function of `sf`.
 
 ```{code-cell} ipython3
 Λ(lambda π: # of d
-  Λ(lambda π: π.g[π.g], ['g'], π)[
-      Λ(lambda π: π.d[Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)],
-        ['sf'], π)], 
-  ['d'])[
+  Λ(lambda π: π.g(π.g), ['g'], π)(
+      Λ(lambda π: π.d(Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)),
+        ['sf'], π)), 
+  ['d'])(
     Λ(lambda π: # of f
       Λ(lambda π: 1 if π.n < 1 else π.n * π.f(π.n - 1), ['n'], π), 
       ['f'])
-](6)
+)(6)
 ```
 
 ## Iterative Factorial via $\Upsilon$
@@ -484,10 +469,10 @@ The thing that looks like "Y" below is actually capital Upsilon ($\Upsilon$ in $
 # λ d: (λ g: g[g])(λ sf: d[λ m, c, x: sf[sf][m, c, x]]) 
 DEFINE('Υ3', 
        Λ(lambda π: # of d, the domain code
-         Λ(lambda π: π.g(π.g), ['g'], π)[
+         Λ(lambda π: π.g(π.g), ['g'], π)(
            Λ(lambda π: π.d(Λ(lambda π: π.sf(π.sf)(π.m, π.c, π.x), 
                    ['m', 'c', 'x'], π)), 
-             ['sf'], π)], 
+             ['sf'], π)), 
          ['d']));
 ```
 
@@ -508,7 +493,7 @@ DEFINE('fact_iter', # domain code ...
 ```
 
 ```{code-cell} ipython3
-ΓΠ.Υ3[ΓΠ.fact_iter][1, 1, 6]
+ΓΠ.Υ3(ΓΠ.fact_iter)(1, 1, 6)
 ```
 
 # Tail Recursion<a id="tail-recursion"></a>
