@@ -62,6 +62,10 @@ Ideally, we'd compile Python into Scheme or Clojure or Common Lisp, then write t
 
 +++
 
+Some people may find this weird. Why not just implement Scheme in Python instead of emulating Scheme in Python? It's an engineering judgment call. Most authors of compilers and interpreters spend undue time on syntax before even getting to semantics. Compiler textbooks tell you to do this! Semantics becomes a hidden "implementation detail," but then developers forgive themselves for making an ungodly mess of it. We prefer the other way around. Get the semantics clean, composable, extendable, maintainable, and correct, _first_, then spend time on syntax, if you even care any more. Or just let someone else do it. From the development point of view, syntax is a distraction. It's been solved for decades, but it makes young developers and professors feel powerful. The decision to spend time on syntax before semantics is not engineering, it's self-indulgence.
+
++++
+
 ## Orthogonality as a Design Principle
 
 +++
@@ -98,7 +102,7 @@ We note in passing that this works only for a single thread. [Clojure, for insta
 
 +++
 
-## Greek<a id="greek"></a>
+## Greek and ALL CAPS<a id="greek"></a>
 
 +++
 
@@ -107,6 +111,10 @@ $\pi$ is a nice pun: it evokes $\pi\eta\rho\iota$, a Greek prefix meaning "surro
 +++
 
 We use Greek letters for system attributes. User code should avoid Greek to avoid clobbering system attributes.
+
++++
+
+We use ALL CAPS for system functions that implement Schemulator.
 
 +++
 
@@ -464,53 +472,59 @@ Abstract into `g` the self-application of the function of the square root, the f
 
 +++
 
-The thing that looks like "Y" below is actually capital Upsilon ($\Upsilon$ in $\LaTeX$). It should not collide with any user symbol if users remember that we use [Greek for system names that users should avoid](#greek).
+The thing that looks like "Y" below is actually capital Upsilon ($\Upsilon$ in $\LaTeX$). Names in user code should not collide with it if users remember that they should [avoid Greek in user code](#greek).
 
 ```{code-cell} ipython3
 # λ d: (λ g: g[g])(λ sf: d[λ m, c, x: sf[sf][m, c, x]]) 
-DEFINE('Υ', 
-       Λ(lambda π: # of d
+DEFINE('Υ3', 
+       Λ(lambda π: # of d, the domain code
          Λ(lambda π: π.g[π.g], ['g'], π)[
            Λ(lambda π: π.d[Λ(lambda π: π.sf[π.sf][π.m, π.c, π.x], 
                    ['m', 'c', 'x'], π)], 
              ['sf'], π)], 
-         ['d']))
+         ['d']));
 ```
 
-This $\Upsilon$ must be tailored for a given number of arguments. We could write a Python-AST hack for that, but that's too far. An alternative is to have a tower of curried but general-purpose multi-pargument $\Upsilon$s. 
+$\Upsilon$ must be tailored for a given number of arguments. This one is for 3 arguments. We could write a Python-AST hack to handle any number of arguments, but that's Python macrology, a rabbit hole we'd like to sidestep for now. An alternative is a tower of general-purpose multi-pargument $\Upsilon$s, and that's OK for now (TODO: reconsider).
 
 +++
 
-Domain code $\Delta$: function of `f`, the recursive _business code_, which is a function of the _business parameters_. This will get us to a tail-recursive solution in the [section on tail recursion](#tail-recursion).
+User-level domain code, redefining `fact_iter`. Any domain code is a function of `f`, recursive _business code_. In this case, `f` is a function of 3 _business parameters_. This will get us to a tail-recursive solution in the [section on tail recursion](#tail-recursion). 
 
 ```{code-cell} ipython3
-DEFINE('Δ',
-       Λ(lambda π: # of f
-         Λ(lambda π: π.m if π.c > π.x else \
-           π.f[π.m * π.c, π.c + 1, π.x],
-           ['m', 'c', 'x'], π),
-         ['f']))
+# λ f: λ m, c, x: m if c > x else f(m*c, c+1, x)
+DEFINE('fact_iter', # domain code ...
+       Λ(lambda π: # ... function of f, which is business code.
+         Λ(lambda π: π.m if π.c > π.x else 
+           π.f[π.m * π.c, π.c + 1, π.x], # business code
+           ['m', 'c', 'x'], π), # business parameters
+         ['f']));
 ```
 
 ```{code-cell} ipython3
-ΓΠ.Υ[ΓΠ.Δ][1, 1, 6]
-#ΓΠ.Υ[ΓΠ.Δ][1, 1, 6]
+ΓΠ.Υ3[ΓΠ.fact_iter][1, 1, 6]
 ```
 
 # Tail Recursion<a id="tail-recursion"></a>
 
 +++
 
-Thanks to [Thomas Baruchel for this idea on tail recursion](https://stackoverflow.com/questions/13591970/does-python-optimize-tail-recursion). The input function must have the form of [_domain code_ as explained in this notebook](https://github.com/rebcabin/rebcabin.github.io/blob/main/PythonYCombinators.ipynb), i.e., `lambda f: lambda args: ...`. This isn't Scheme proper, but it's akin to Clojure, where the user must explicitly write `loop` and `recur`, presumably implemented quite like this.
+Thanks to [Thomas Baruchel for this idea on tail recursion](https://stackoverflow.com/questions/13591970/does-python-optimize-tail-recursion). If users are aware that their domain code is tail-recursive, then they may call it as follows instead of through $\Upsilon$. In Scheme, tail recursion is the default, but in Python and Schemulator, users must manage it explicitly. This isn't a terrible issue, tail-calls are lexically obvious. Clojure does likewise, where users must explicitly write `loop` and `recur`.
+
++++
+
+The thing that looks like "P" below is Greek Capital Rho for "recur" and "B" is Greek Capital Beta for "Baruchel." B has the same signature as $\Upsilon$; it takes a _domain code_ as its sole argument. Names in user code should not collide with P and B if users remember that they should [avoid Greek in user code](#greek). As with $\Upsilon$, Rho must know its number of arguments. That's OK for now (TODO: reconsider).
 
 ```{code-cell} ipython3
-class RecursiveCall(Exception):
+class TailCall(Exception):  # αναδρομική_κλήση
     def __init__(self, *args):
         self.args = args
 
-def RECUR(*args):
-    raise RecursiveCall(*args)
+def RECUR(*args):  # υψώνω
+    raise TailCall(*args)
 
+DEFINE('Ρ3', Λ(lambda π: 0, ['m', 'c', 'x']))
+        
 def bet0(func):
     def recursor(*args):
         raise RecursiveCall(*args)
@@ -519,18 +533,35 @@ def bet0(func):
         while True:
             try:
                 return func(RECUR)(*args)
-            except RecursiveCall as e:
+            except TailCall as e:
+                args = e.args
+    return wrapper
+
+bet0(lambda f: lambda m, c, x: \
+     m if c > x else \
+     f(c * m, c + 1, x))(1, 1, 6)
+```
+
+```{code-cell} ipython3
+class TailCall(Exception):
+    def __init__(self, *args):
+        self.args = args
+        
+def RECUR(*args):
+    raise TailCall(*args)
+
+def bet0(func):
+    def wrapper(*args):
+        while True:
+            try:
+                return func(RECUR)(*args)
+            except TailCall as e:
                 args = e.args
     return wrapper
 
 bet0(lambda f: lambda product, counter, max_count: \
      product if counter > max_count else \
-     f(counter * product, counter + 1, max_count))(1, 1, 6)
-
-DEFINE(
-    'fact_iter_tail_recursive', 
-    ['product', 'counter', 'max_count'],
-    
+     f(counter * product, counter + 1, max_count))(1, 1, 6)    
 ```
 
 ```{code-cell} ipython3
