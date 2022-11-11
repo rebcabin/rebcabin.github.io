@@ -231,7 +231,7 @@ as follows:
 (lambda sf: 
  (lambda f: 
   (lambda n: 1 if n < 1 else n * f(n - 1)))\
- (lambda m: sf(sf)(m))(n - 1))
+ (lambda m: sf(sf)(m)))
 ```
 
 `(lambda m: sf(sf)(m))`$(\mathscr{N})$, always has the same value as `sf(sf)`$(\mathscr{N})$. The two expressions just evaluate `sf(sf)` at different times. In the first case, `sf(sf)` is evaluated later when `(lambda m: sf(sf)(m))` is applied to $\mathscr{N}$. The enclosing `lambda` means "_evaluate my guts later, when things might be better defined_." In the second case, `sf(sf)` is evaluated first, before being applied to $\mathscr{N}$, but that's too early.
@@ -262,10 +262,12 @@ Now, as before, abstract `(lambda m: sf(sf)(m)`, merely a delayed version of `sf
 ```python
 ((lambda sf: 
   (lambda f:
-   (lambda n: 1 if n < 1 else n * f(n - 1)))(lambda m: sf(sf)(m)))
+   (lambda n: 1 if n < 1 else n * f(n - 1)))
+  (lambda m: sf(sf)(m)))
  (lambda sf: 
   (lambda f:
-   (lambda n: 1 if n < 1 else n * f(n - 1)))(lambda m: sf(sf)(m))))(6)
+   (lambda n: 1 if n < 1 else n * f(n - 1)))
+  (lambda m: sf(sf)(m))))(6)
 ```
 
 ## Step 2: Abstract the Domain Code

@@ -30,7 +30,7 @@ In a classic paper, [_Lambda, the Ultimate Imperative_](https://www.researchgate
 
 +++
 
-> We demonstrate how to model the following common [imperative] programming constructs in ... an applicative-order language similar to LISP: Simple Recursion, Iteration, Compound Statements and Expressions, GO TO and Assignment, Continuation-Passing, Escape Expressions, Fluid Variables, Call by Name, Call by Need, and Call by Reference. The models require only (possibly self-referent) lambda application, conditionals, and (rarely) assignment. 
+> We demonstrate how to model the following common [imperative] programming constructs in ... an applicative-order language similar to LISP: Simple Recursion, Iteration, Compound Statements and Expressions, GO TO and Assignment, Continuation-Passing, Escape Expressions, Fluid Variables, Call by Name, Call by Need, and Call by Reference. The models require only (possibly self-referent) lambda application, conditionals, and (rarely) assignment.
 
 +++
 
@@ -58,7 +58,7 @@ We follow the paper more-or-less directly, with gleanings from [SICP](https://sa
 
 +++
 
-Ideally, we'd compile Python into Scheme or Clojure or Common Lisp, then write transformations, translations, interpreters, debuggers, etc. in Scheme or Clojure or Common Lisp. However, to maintain a convenient notebook structure and to avoid creeping dependencies, we'll just model Python imperatives in a Scheme-like applicative-order $\lambda$ calculus embedded in basic Python. 
+Ideally, we'd compile Python into Scheme or Clojure or Common Lisp, then write transformations, translations, interpreters, debuggers, etc. in Scheme or Clojure or Common Lisp. However, to maintain a convenient notebook structure and to avoid creeping dependencies, we'll just model Python imperatives in a Scheme-like applicative-order $\lambda$ calculus embedded in basic Python.
 
 +++
 
@@ -82,7 +82,7 @@ We find it necessary to model Scheme's environments and frames explicitly. We tr
 
 +++
 
-[SICP 3.2](https://sarabander.github.io/sicp/html/3_002e2.xhtml#g_t3_002e2) has some apparent contradictions in the definition of environment and frame. It says that "an environment is a sequence of frames," but the rest of the text and figures clearly imply that an environment has just one frame. 
+[SICP 3.2](https://sarabander.github.io/sicp/html/3_002e2.xhtml#g_t3_002e2) has some apparent contradictions in the definition of environment and frame. It says that "an environment is a sequence of frames," but the rest of the text and figures clearly imply that an environment has just one frame.
 
 +++
 
@@ -90,11 +90,15 @@ The best resolution appears to be:
 
 +++
 
-> An ___environment___ is a frame $\phi$ and a pointer $\pi$ to an enclosing environment. A ___frame___ is a mathematical function from variable names to values; no variable name may appear more than once in a frame. 
+> An ___environment___ is a frame $\phi$ and a pointer $\pi$ to an enclosing environment. A ___frame___ is a mathematical function from variable names to values; no variable name may appear more than once in a frame.
 
 +++
 
-We note in passing that this works only for a single thread. [Clojure, for instance, solves that problem with _Vars_](https://clojure.org/reference/vars). 
+We note in passing that this works only for a single thread. [Clojure, for instance, solves that problem with _Vars_](https://clojure.org/reference/vars).
+
++++
+
+## Greek<a id="greek"></a>
 
 +++
 
@@ -106,7 +110,11 @@ We use Greek letters for system attributes. User code should avoid Greek to avoi
 
 +++
 
-> A ___binding___ is an association from a variable name to a value, that is, an entry in a frame. 
+## Bindings
+
++++
+
+> A ___binding___ is an association from a variable name to a value, that is, an entry in a frame.
 
 +++
 
@@ -118,7 +126,7 @@ If the definitions above are acceptable, the apparent contradiction in SICP is r
 
 +++
 
-> The system maintains a unique ___global environment___, whose _pointer-to-enclosing-environment_ is `None`. 
+> The system maintains a unique ___global environment___, whose _pointer-to-enclosing-environment_ is `None`.
 
 +++
 
@@ -126,11 +134,19 @@ If the definitions above are acceptable, the apparent contradiction in SICP is r
 
 +++
 
-Thanks to [divs1210](https://gist.github.com/divs1210?page=3) for the idea of assigning attributes to a dummy function object.
+Thanks to [divs1210](https://gist.github.com/divs1210?page=3) for the idea of modeling frames as dummy lambda functions, and assigning attributes to them.
 
 +++
 
 We override `__getattr__` to avoid a separate function for recursive lookup. We can't also override `__setaddr__` to call `setattr(self.$\phi$ ...)` because `self.$\phi$` diverges on `getattr(self.$\phi$ ...)`.
+
++++
+
+There is a unique global environment, $\Gamma\Pi$, for each session.
+
++++
+
+TODO: Coalesce $\Gamma\Pi$ with Python's global environment.
 
 ```{code-cell} ipython3
 from dataclasses import dataclass, field
@@ -166,7 +182,11 @@ setattr(ΓΠ.ϕ, 'γόὂ', 43)
 
 +++
 
-A ___procedure___ is a pair of code and environment. ___Code___ is a dictionary of parameter names and a $\lambda$ expression. The $\lambda$, by convention, takes a sigle argument, $\pi$, the environment in which its formal parameters are bound to actual arguments via some application of the procedure, as described in SICP 3.2. This convention seems to be the best we can do for composable $\lambda$s in Schemulator. For now, we support only positional arguments, one-to-one with the argument list. That's consistent with [Gambit Scheme](https://github.com/gambit/gambit), which reports "Wrong number of arguments ..." if the application has too many or too few arguments.
+A ___procedure___ is a pair of code and environment. ___Code___ is a dictionary of parameter names and a $\lambda$ expression. The $\lambda$, by convention, takes a sigle argument, $\pi$, the environment in which its formal parameters are bound to actual arguments via procedure application, as described in SICP 3.2. This convention seems to be the best we can do for composable $\lambda$s in Schemulator. For now, we support only positional arguments, one-to-one with the argument list. That's consistent with [Gambit Scheme](https://github.com/gambit/gambit), which reports "Wrong number of arguments ..." if the application has too many or too few arguments.
+
++++
+
+By default, procedures are defined in the unique global environment, $\Gamma\Pi$.
 
 +++
 
@@ -175,18 +195,21 @@ Experimental: `__getitem__` call syntax.
 ```{code-cell} ipython3
 from typing import Dict, List, Tuple
 Parameters = List[str]  # positional arguments only
-def APPLY(proc, args, π):
+def APPLY(proc, args, π=ΓΠ):
     """forward reference; Will be redefined."""
     print(args)
 @dataclass
 class Procedure:
     code: Dict
-    π: Environment
+    π: Environment=ΓΠ  # Defined in global environment by default.
     def __getitem__(self, keys):
         if isinstance(keys, List) or isinstance(keys, Tuple):
             return APPLY(self, keys, self.π)
         else:
             return APPLY(self, [keys], self.π)
+# experimental:
+#    def __call__(self, *args):
+#        return APPLY(self, args, self.π)
 ```
 
 Following the example for _square_ in SICP 3.2.1, let's define it in the global environment and test the invocation of `APPLY`:
@@ -197,8 +220,31 @@ setattr(
     "square", 
     Procedure(
         {"body": lambda π: π.x * π.x,  # ugly, I know; sorry :(
-         "parameters": ['x']}, 
-        ΓΠ))
+         "parameters": ['x']}))
+ΓΠ.square[5]
+ΓΠ.square[5, 6]
+#ΓΠ.square(5)
+#ΓΠ.square(5, 6)
+```
+
+## $\Lambda$
+
++++
+
+Some syntactical help for anonymous procedures:
+
+```{code-cell} ipython3
+def Λ(body, parameters, π=ΓΠ):
+    return Procedure(code={
+        "body": body, "parameters": parameters}, 
+              π=π)
+```
+
+```{code-cell} ipython3
+setattr(
+    ΓΠ.ϕ,
+    "square",
+    Λ(lambda π: π.x * π.x, ['x']))
 ΓΠ.square[5]
 ΓΠ.square[5, 6]
 ```
@@ -211,7 +257,7 @@ work in progress
 
 ```{code-cell} ipython3
 from typing import Any
-def EVAL(expr: Any, π: Environment) -> Any:
+def EVAL(expr: Any, π: Environment=ΓΠ) -> Any:
     """Python does almost all this for us."""
     if isinstance(expr, int) or \
        isinstance(expr, float) or \
@@ -227,11 +273,15 @@ def EVAL(expr: Any, π: Environment) -> Any:
 
 ## APPLY
 
++++
+
+By default, procedures are applied in the unique global environment, $\Gamma\Pi$.
+
 ```{code-cell} ipython3
 class IllegalArgumentsError(ValueError):
     pass
 
-def APPLY(proc: Procedure, args: List[Any], π:Environment) -> Any:
+def APPLY(proc: Procedure, args: List[Any], π:Environment=ΓΠ) -> Any:
     """How about a nice __getitem__ overload on 'Procedure' for this."""
     if len(proc.code['parameters']) != len(args):
         raise IllegalArgumentsError(
@@ -243,41 +293,19 @@ def APPLY(proc: Procedure, args: List[Any], π:Environment) -> Any:
     result = proc.code['body'](E1)
     return result
     
-print(APPLY(ΓΠ.square, [5], ΓΠ))
+print(APPLY(ΓΠ.square, [5]))
 ```
 
-Square-bracket notation (like Wolfram / Mathematica) works
+Square-bracket notation (like Wolfram / Mathematica) works:
 
 ```{code-cell} ipython3
-print(ΓΠ.square[5])
+ΓΠ.square[5]
 ```
 
 Works on anonymous procedures, too:
 
 ```{code-cell} ipython3
-print(
-    Procedure(code={
-        "body": lambda π: π.x * π.x, 
-        "parameters": ['x']}, π=ΓΠ)
-    [5])
-```
-
-procedures that return procedures:
-
-```{code-cell} ipython3
-print('f' in dir(ΓΠ.ϕ))
-# λ d: (λ g: g(g))(λ sf: d[λ m: sf[sf][m]]) from 
-Procedure(code={"body":
-               parameters: ['d']})
-Procedure(code={"body": 
-                lambda π: 
-                Procedure(code={"body": lambda π: 
-                                π.product if π.counter > π.max_count else \
-                                π.f[π.counter * π.product, π.counter + 1, π.max_count],
-                                "parameters": ['product', 'counter', 'max_count']}, π=π),
-                "parameters": ['f']}, π=ΓΠ)
-
-#    [1, 1, 6], π=ΓΠ)
+Λ(lambda π: π.x * π.x, ['x'])[5]
 ```
 
 ## DEFINE
@@ -286,25 +314,18 @@ Procedure(code={"body":
 
 Package up the "defining" boilerplate.
 
++++
+
+By default, symbols are defined in the unique global environment, $\Gamma\Pi$.
+
 ```{code-cell} ipython3
-def DEFINE(sym: str, val: Any, π: Environment) -> None:
+def DEFINE(sym: str, val: Any, π: Environment=ΓΠ) -> None:
     """official Scheme"""
     setattr(π.ϕ, sym, val)
-def DEFINE_PROC(sym: str, 
-                parameters: List[str], 
-                body: FunctionType, 
-                π: Environment) -> None:
-    """unofficial convenience (alternative syntax in Scheme)"""
-    DEFINE(
-        sym,
-        Procedure(
-            {"body": body, "parameters": parameters}, 
-            π),
-        π)
-    
-DEFINE_PROC('saxpy', ['a', 'x', 'y'],
-            lambda π: π.a * π.x + π.y, 
-            ΓΠ)  # ugly, i know; sorry :(
+    return val
+
+DEFINE('saxpy', 
+       Λ(lambda π: π.a * π.x + π.y, ['a', 'x', 'y']))
 
 ΓΠ.saxpy[4, 10, 2]
 ```
@@ -312,19 +333,14 @@ DEFINE_PROC('saxpy', ['a', 'x', 'y'],
 ### SICP 3.2.2
 
 ```{code-cell} ipython3
-DEFINE_PROC('square', ['x'], 
-            lambda π: π.x * π.x, 
-            ΓΠ)
+DEFINE('square', 
+       Λ(lambda π: π.x * π.x, ['x']))
 
-DEFINE_PROC('sum_of_squares', ['x', 'y'],
-           lambda π: \
-            π.square[π.x] + π.square[π.y],
-           ΓΠ)
+DEFINE('sum_of_squares',
+       Λ(lambda π: π.square[π.x] + π.square[π.y], ['x', 'y']))
 
-DEFINE_PROC('f', ['a'],
-           lambda π: \
-            π.sum_of_squares[1 + π.a, 2 * π.a],
-            ΓΠ)
+DEFINE('f',
+       Λ(lambda π: π.sum_of_squares[1 + π.a, 2 * π.a], ['a']))
 
 ΓΠ.f[5]
 ```
@@ -332,10 +348,9 @@ DEFINE_PROC('f', ['a'],
 ### Exercise 3.9
 
 ```{code-cell} ipython3
-DEFINE_PROC('factorial', ['n'],
-           lambda π: 1 if π.n < 2 else \
-            π.n * π.factorial[π.n - 1],
-           ΓΠ)
+DEFINE('factorial',
+       Λ(lambda π: 1 if π.n < 2 else \
+         π.n * π.factorial[π.n - 1], ['n']))
 
 ΓΠ.factorial[6]
 ```
@@ -343,15 +358,143 @@ DEFINE_PROC('factorial', ['n'],
 This doesn't tail-recurse because Python does not tail-recurse. See [Tail Recursion](#tail-recursion) for mitigation work-in-progress.
 
 ```{code-cell} ipython3
-DEFINE_PROC('fact_iter', ['product', 'counter', 'max_count'],
-           lambda π: π.product if π.counter > π.max_count else \
-           π.fact_iter[
-               π.counter * π.product,
-               π.counter + 1,
-               π.max_count
-           ], ΓΠ)
+DEFINE('fact_iter',
+       Λ(lambda π: π.product if π.counter > π.max_count else \
+         π.fact_iter[
+           π.counter * π.product,
+           π.counter + 1,
+           π.max_count
+           ], ['product', 'counter', 'max_count']))
 
 ΓΠ.fact_iter[1, 1, 6]
+```
+
+## Procedures that Apply Procedures
+
+```{code-cell} ipython3
+Λ(lambda π: π.f[π.x],['f', 'x'])[ΓΠ.square, 42]
+```
+
+Anonymously; shadowing is no problem, here:
+
+```{code-cell} ipython3
+Λ(lambda π: Λ(lambda π: π.n * π.n, ['n'], π)[π.n], ['n'])[42]
+```
+
+But you had better include the non-default $\pi$ on the inner if you don't want accidentally the correct answer.
+
+```{code-cell} ipython3
+Λ(lambda π: Λ(lambda π: π.x * π.n, ['x'], π)[π.n], ['n'])[42]
+```
+
+## Procedures that Return Procedures
+
+```{code-cell} ipython3
+Λ(lambda π: π.f, ['f'])[ΓΠ.square][42]
+```
+
+Anonymously:
+
+```{code-cell} ipython3
+Λ(lambda π: π.f, ['f'])[Λ(lambda π: π.x * π.x, ['x'])][42]
+```
+
+## Square Roots of Functions
+
++++
+
+[See this other noteobook](https://github.com/rebcabin/rebcabin.github.io/blob/main/PythonYCombinators.md). We follow its derivations step-by-step from first principles.
+
++++
+
+Don't forget non-default $\pi$ on the inner lest `sf` be undefined.
+
+```{code-cell} ipython3
+Λ(lambda π: 
+  Λ(lambda π: 1 if π.n < 1 else π.n * π.sf[π.sf][π.n - 1], ['n'], π), ['sf'])[
+    Λ(lambda π: 
+      Λ(lambda π: 1 if π.n < 1 else π.n * π.sf[π.sf][π.n - 1], ['n'], π), ['sf'])][6]
+```
+
+Abstract into a $\lambda$ of `m` a $\lambda$-delayed self-application of `sf`:
+
+```{code-cell} ipython3
+Λ(lambda π: 
+  Λ(lambda π: 
+    Λ(lambda π: 1 if π.n < 1 else π.n * π.f[π.n - 1], ['n'], π), 
+    ['f'], π)[Λ(lambda π: π.sf[π.sf][π.m], ['m'], π)], 
+  ['sf'])[
+Λ(lambda π: 
+  Λ(lambda π: 
+    Λ(lambda π: 1 if π.n < 1 else π.n * π.f[π.n - 1], ['n'], π), 
+    ['f'], π)[Λ(lambda π: π.sf[π.sf][π.m], ['m'], π)], 
+  ['sf'])][6]
+```
+
+Abstract into `d` the _domain code_, a function of `f`, the _business code_, a function of `n`, the _busieness parameter_.
+
+```{code-cell} ipython3
+Λ(lambda π: # of d
+  Λ(lambda π: π.d[Λ(lambda π: π.sf[π.sf][π.m], ['m'], π)],
+    ['sf'], π)[
+      Λ(lambda π: π.d[Λ(lambda π: π.sf[π.sf][π.m], ['m'], π)],
+        ['sf'], π)], 
+  ['d'])[
+    Λ(lambda π: # of f
+      Λ(lambda π: 1 if π.n < 1 else π.n * π.f[π.n - 1], ['n'], π), 
+      ['f'])
+][6]
+```
+
+Abstract into `g` the self-application of the function of the square root, the function of `sf`.
+
+```{code-cell} ipython3
+Λ(lambda π: # of d
+  Λ(lambda π: π.g[π.g], ['g'], π)[
+      Λ(lambda π: π.d[Λ(lambda π: π.sf[π.sf][π.m], ['m'], π)],
+        ['sf'], π)], 
+  ['d'])[
+    Λ(lambda π: # of f
+      Λ(lambda π: 1 if π.n < 1 else π.n * π.f[π.n - 1], ['n'], π), 
+      ['f'])
+][6]
+```
+
+## Iterative Factorial via $\Upsilon$
+
++++
+
+The thing that looks like "Y" below is actually capital Upsilon ($\Upsilon$ in $\LaTeX$). It should not collide with any user symbol if users remember that we use [Greek for system names that users should avoid](#greek).
+
+```{code-cell} ipython3
+# λ d: (λ g: g[g])(λ sf: d[λ m, c, x: sf[sf][m, c, x]]) 
+DEFINE('Υ', 
+       Λ(lambda π: # of d
+         Λ(lambda π: π.g[π.g], ['g'], π)[
+           Λ(lambda π: π.d[Λ(lambda π: π.sf[π.sf][π.m, π.c, π.x], 
+                   ['m', 'c', 'x'], π)], 
+             ['sf'], π)], 
+         ['d']))
+```
+
+This $\Upsilon$ must be tailored for a given number of arguments. We could write a Python-AST hack for that, but that's too far. An alternative is to have a tower of curried but general-purpose multi-pargument $\Upsilon$s. 
+
++++
+
+Domain code $\Delta$: function of `f`, the recursive _business code_, which is a function of the _business parameters_. This will get us to a tail-recursive solution in the [section on tail recursion](#tail-recursion).
+
+```{code-cell} ipython3
+DEFINE('Δ',
+       Λ(lambda π: # of f
+         Λ(lambda π: π.m if π.c > π.x else \
+           π.f[π.m * π.c, π.c + 1, π.x],
+           ['m', 'c', 'x'], π),
+         ['f']))
+```
+
+```{code-cell} ipython3
+ΓΠ.Υ[ΓΠ.Δ][1, 1, 6]
+#ΓΠ.Υ[ΓΠ.Δ][1, 1, 6]
 ```
 
 # Tail Recursion<a id="tail-recursion"></a>
