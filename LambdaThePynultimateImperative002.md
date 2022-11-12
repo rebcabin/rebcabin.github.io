@@ -562,7 +562,7 @@ def LOOP3(d: Procedure) -> Procedure:
     result = Λ(lambda π: looper(π.m, π.c, π.x), ['m', 'c', 'x'], π=d.π)
     return result
 
-LOOP3(ΓΠ.fact_iter)(1, 1, 6)  # <~~~ DON'T DO THIS, even though it works
+LOOP3(ΓΠ.fact_iter)(1, 1, 20)
 ```
 
 Results are undefined if you call any `LOOP` function with non-tail-recursive domain code.
@@ -622,7 +622,7 @@ To pass a memo table, we'll need $\Upsilon2C$, which is generic for 2-parameter,
 DEFINE('Υ2C', 
        Λ(lambda π: # function of domain code, d ...
          Λ(lambda π: π.g(π.g), ['g'], π)(
-             # with business code of 2 parameters
+             # with business code of 2 parameters, curried
              Λ(lambda π: 
                π.d(Λ(lambda π: 
                      Λ(lambda π: π.sf(π.sf)(π.m)(π.n), 
@@ -635,21 +635,21 @@ The domain code for a memoized, Curried Fibonacci follows. The parameter `a` is 
 
 ```{code-cell} ipython3
 DEFINE('fib_fast',
-       Λ(lambda π: # of f, level 1
-         Λ(lambda π: # of a, level 2
-           Λ(lambda π: # of n, level 3
+       Λ(lambda π: # of f; level 1
+         Λ(lambda π: # of a; level 2
+           Λ(lambda π: # of n; level 3
              (π.a, 1) if π.n < 2 else
-             Λ(lambda π: # of n_1, level 4
-               Λ(lambda π: # of fim1, level 5
-                 Λ(lambda π: # of m1, level 6
-                   Λ(lambda π: # of r1, level 7
-                     Λ(lambda π: # of a1, level 8
-                       Λ(lambda π: # of n_2, level 9
+             Λ(lambda π: # of n_1; level 4
+               Λ(lambda π: # of fim1; level 5
+                 Λ(lambda π: # of m1; level 6
+                   Λ(lambda π: # of r1; level 7
+                     Λ(lambda π: # of a1; level 8
+                       Λ(lambda π: # of n_2; level 9
                          (π.a1, π.r1 + π.a1[π.n_2]) if π.n_2 in π.a1 else 
-                         Λ(lambda π: # of fim2, level 10
-                           Λ(lambda π: # of m2, level 11
-                             Λ(lambda π: # of r2, level 12
-                               Λ(lambda π: # of a2, level 13
+                         Λ(lambda π: # of fim2; level 10
+                           Λ(lambda π: # of m2; level 11
+                             Λ(lambda π: # of r2; level 12
+                               Λ(lambda π: # of a2; level 13
                                  (π.a2, π.r1 + π.r2), 
                                  ['a2'], π)(π.m2[0] | {π.n_2: π.r2}), 
                                ['r2'], π)(π.m2[1]), 
@@ -687,12 +687,98 @@ except RecursionError as e:
     print(e.args)
 ```
 
+... then write an $\Upsilon2$ and a  `LOOP2` according to the pattern set above.
+
+```{code-cell} ipython3
+DEFINE('Υ2', 
+       Λ(lambda π: # of d, the domain code ...
+         Λ(lambda π: π.g(π.g), ['g'], π)(
+             # of business code of two parameters
+             Λ(lambda π: π.d(Λ(lambda π: π.sf(π.sf)(π.m, π.c), 
+                               ['m', 'c'], π)), 
+               ['sf'], π)), 
+         ['d']));
+
+def LOOP2(d: Procedure) -> Procedure:
+    """in sincere flattery of Clojure, and thanks to Thomas Baruchel."""
+    DEFINE('Ρ2', Λ(lambda π: RECUR(π.m, π.c), ['m', 'c']));
+    def looper(*args):
+        """Expression form of a while-loop statement."""
+        while True:
+            try: 
+                print({"LOOP2": args})
+                return d(ΓΠ.Ρ2)(*args)
+            except TailCall as e:
+                args = e.args
+    result = Λ(lambda π: looper(π.m, π.c), ['m', 'c'], π=d.π)
+    return result
+```
+
+```{code-cell} ipython3
+DEFINE('fib_fast_uncurried',
+      Λ(lambda π: # of f; level 1
+        Λ(lambda π: # of a, n; level 2
+          (π.a, 1) if π.n < 2 else
+          Λ(lambda π: # of n_1; level 3
+            Λ(lambda π: # of t1; level 4
+              Λ(lambda π: # of m1; level 5
+                Λ(lambda π: # of r1; level 6
+                  Λ(lambda π: # of a1; level 7
+                    Λ(lambda π: # of n_2; level 8
+                      (π.a1, π.r1 + π.a1[π.n_2]) if π.n_2 in π.a1 else 
+                      Λ(lambda π: # of t_2; level 9
+                        Λ(lambda π: # of m_2; level 10
+                          Λ(lambda π: # of r_2; level 11
+                            Λ(lambda π: # of a_2; level 12
+                              (π.a2, π.r1 + π.r2),
+                              ['a2'], π)(π.m2 | {π.n_2: π.r2}), 
+                            ['r2'], π)(π.t2[1]), 
+                          ['m2'], π)(π.t2[0]), 
+                        ['t2'], π)(π.f(π.a1, π.n_2)), 
+                      ['n_2'], π)(π.n - 2), 
+                    ['a1'], π)(π.m1 | {π.n_1: π.r1}), 
+                  ['r1'], π)(π.t1[1]), 
+                ['m1'], π)(π.t1[0]),
+              ['t1'], π)(π.f(π.a, π.n_1)),
+            ['n_1'], π)(π.n - 1),
+          ['a', 'n'], π), 
+        ['f']));
+```
+
+```{code-cell} ipython3
+LOOP2(ΓΠ.fib_fast_uncurried)({}, 3)[1]
+```
+
+```{code-cell} ipython3
+ΓΠ.Υ2(ΓΠ.fib_fast_uncurried)({}, 2)[1]
+```
+
+```{code-cell} ipython3
+try:
+    print(ΓΠ.Υ2(ΓΠ.fib_fast_uncurried)({}, 246)[1])
+except RecursionError as e:
+    print(e.args)
+    
+try:
+    print(ΓΠ.Υ2(ΓΠ.fib_fast_uncurried)({}, 245)[1])
+except RecursionError as e:
+    print(e.args)
+```
+
+```{code-cell} ipython3
+try:
+    print(LOOP2(ΓΠ.fib_fast_uncurried)({}, 246))
+except RecursionError as e:
+    print(e.args)
+    
+try:
+    print(LOOP2(ΓΠ.fib_fast_uncurried)({}, 245))
+except RecursionError as e:
+    print(e.args)
+```
+
 # Junkyard
 
 +++
 
 Ignore everything below. It's saved in case we need it someday.
-
-```{code-cell} ipython3
-
-```
