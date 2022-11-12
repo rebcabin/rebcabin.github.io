@@ -18,7 +18,7 @@ kernelspec:
 
 #### Version 2
 #### Brian Beckman
-#### 9 Nov 2022
+#### 12 Nov 2022
 
 +++
 
@@ -412,6 +412,10 @@ Anonymously:
 
 +++
 
+The running example is recursive factorial.
+
++++
+
 Don't forget non-default $\pi$ on the inner lest `sf` be undefined.
 
 ```{code-cell} ipython3
@@ -421,7 +425,7 @@ Don't forget non-default $\pi$ on the inner lest `sf` be undefined.
       Λ(lambda π: 1 if π.n < 1 else π.n * π.sf(π.sf)(π.n - 1), ['n'], π), ['sf']))(6)
 ```
 
-Abstract into a $\lambda$ of `m` a $\lambda$-delayed self-application of `sf`:
+Abstract `sf(sf)(m)` into a delayed $\lambda$ of `m`:
 
 ```{code-cell} ipython3
 Λ(lambda π: 
@@ -436,7 +440,7 @@ Abstract into a $\lambda$ of `m` a $\lambda$-delayed self-application of `sf`:
   ['sf']))(6)
 ```
 
-Abstract into `d` the _domain code_, a function of `f`, the _business code_, a function of `n`, the _busieness parameter_.
+Abstract the _domain code_ into `d`, a function of `f`, the _business code_, is a function of `n`, the _business parameter_.
 
 ```{code-cell} ipython3
 Λ(lambda π: # of d
@@ -451,7 +455,7 @@ Abstract into `d` the _domain code_, a function of `f`, the _business code_, a f
     )(6)
 ```
 
-Abstract into `g` the self-application of the function of the square root, the function of `sf`.
+Abstract the self-applied $\lambda$ of `sf` into `g`:
 
 ```{code-cell} ipython3
 Λ(lambda π: # function of domain code, d
@@ -470,7 +474,11 @@ Abstract into `g` the self-application of the function of the square root, the f
 
 +++
 
-Package into a system function, $\Upsilon{}1$, for later use. The "1" in the name means that this combinator is for domain codes that return business codes of one parameter:
+The glyph that looks like "Y" is actually capital Upsilon ($\Upsilon$ in $\LaTeX$). Names in user code should not collide with it if users remember that they should [avoid Greek in user code](#greek).
+
++++
+
+Package into a system function, $\Upsilon{}1$, for later use. The "1" in the name means that this is for domain codes that return business codes of one parameter:
 
 ```{code-cell} ipython3
 DEFINE('Υ1', 
@@ -494,7 +502,7 @@ DEFINE('fact_recursive',
 
 +++
 
-The thing that looks like "Y" below is actually capital Upsilon ($\Upsilon$ in $\LaTeX$). Names in user code should not collide with it if users remember that they should [avoid Greek in user code](#greek).
+$\Upsilon$ must be tailored for a given number of business parameters. This one is for three. We could write a Python-AST hack to handle any number of business parameters, but that's Python macrology, a rabbit hole to sidestep for now (TODO: reconsider).
 
 ```{code-cell} ipython3
 # λ d: (λ g: g[g])(λ sf: d[λ m, c, x: sf[sf][m, c, x]]) 
@@ -508,11 +516,7 @@ DEFINE('Υ3',
          ['d']));
 ```
 
-$\Upsilon$ must be tailored for a given number of arguments. This one is for 3 arguments. We could write a Python-AST hack to handle any number of arguments, but that's Python macrology, a rabbit hole we'd like to sidestep for now. An alternative is a tower of general-purpose multi-pargument $\Upsilon$s, and that's OK for now (TODO: reconsider).
-
-+++
-
-User-level domain code, redefining `fact_iter`. Any domain code is a function of `f`, recursive _business code_. In this case, `f` is a function of 3 _business parameters_. This will get us to a tail-recursive solution in the [section on tail recursion](#tail-recursion). 
+Here is user-level domain code, redefining `fact_iter` in domain-code form. Any domain code is a function of `f`, recursive _business code_. In this case, `f` is a function of 3 business parameters. This will get us to a tail-recursive solution in the [section on tail recursion](#tail-recursion). 
 
 ```{code-cell} ipython3
 # λ f: λ m, c, x: m if c > x else f(m*c, c+1, x)
@@ -532,11 +536,11 @@ DEFINE('fact_iter', # domain code is a function of f ...
 
 +++
 
-Thanks to [Thomas Baruchel for this idea on tail recursion](https://stackoverflow.com/questions/13591970/does-python-optimize-tail-recursion). If users are aware that their domain code is tail-recursive, then they may call it as follows instead of through $\Upsilon$. In Scheme, tail recursion is the default, but in Python and Schemulator, users must manage tail recursion explicitly. This isn't a terrible issue, tail-calls are lexically obvious, so users should always know. Clojure does likewise, where users must explicitly write `loop` and `recur`. In any event, domain code can always be called via the proper $\Upsilon$, the one that knows the actual argument count. 
+Thanks to [Thomas Baruchel for this idea on tail recursion](https://stackoverflow.com/questions/13591970/does-python-optimize-tail-recursion). If users are aware that their domain code is tail-recursive, then they may call it via `LOOP` instead of via $\Upsilon$. In Scheme, detection of tail recursion is automatic. In Python and Schemulator, users must manage tail recursion explicitly. This isn't a terrible issue. Tail-calls are lexically obvious, so users should always know. In Clojure, there is precedent. Users must explicitly write `loop` and `recur`. In any event, domain code can always be called via the proper $\Upsilon$, the one that knows the count of business parameters.
 
 +++
 
-We imitate Clojure's names `loop` and `recur`. The thing that looks like "P" below is Greek Capital Rho for "recur." `LOOP3` has the same signature as $\Upsilon3$; it takes domain code as its sole argument. Names in user code should not collide with P B if users remember that they should [avoid Greek in user code](#greek). As with $\Upsilon$, Rho and `LOOP` must know their argument counts. That's OK for now (TODO: reconsider).
+We imitate Clojure's names `loop` and `recur`. The glyph that looks like "P" below is Greek Capital Rho for "recur." `LOOP3` has the same signature as $\Upsilon3$; it takes domain code as its sole argument. Names in user code should not collide with P B if users remember that they should [avoid Greek in user code](#greek). As with $\Upsilon$, Rho and `LOOP` must know their argument counts. That's OK for now (TODO: reconsider).
 
 ```{code-cell} ipython3
 class TailCall(Exception):  
@@ -565,7 +569,7 @@ def LOOP3(d: Procedure) -> Procedure:
 LOOP3(ΓΠ.fact_iter)(1, 1, 20)
 ```
 
-Results are undefined if you call any `LOOP` function with non-tail-recursive domain code.
+> ***Results are undefined if you call any `LOOP` function with non-tail-recursive domain code.***
 
 +++
 
@@ -591,7 +595,7 @@ except RecursionError as e:
     print(e.args)
 ```
 
-# Memoization [sic]
+## Tail-Recursive Fibonacci<a id="tail-recursive-fibonacci"></a>
 
 +++
 
@@ -600,7 +604,8 @@ Write domain code for catastropically slow, non-tail-recursive, exponentially di
 ```{code-cell} ipython3
 DEFINE('fib_slow', 
        Λ(lambda π: 
-         Λ(lambda π: 1 if π.n < 2 else π.f(π.n - 1) + π.f(π.n - 2), ['n'], π),
+         Λ(lambda π: 1 if π.n < 2 else 
+           π.f(π.n - 1) + π.f(π.n - 2), ['n'], π),
          ['f']))
 
 ΓΠ.Υ1(ΓΠ.fib_slow)(6)
@@ -616,7 +621,44 @@ This is miserable even for $n=23$. You won't want to call it for bigger argument
 timeit(ΓΠ.Υ1(ΓΠ.fib_slow)(23))
 ```
 
-To pass a memo table, we'll need $\Upsilon2C$, which is generic for 2-parameter, Curried business code:
+Without linearization, Fibonacci 500 would not complete in $10^{30}$ times the Age of the Universe. One way to linearize is tail recursion. Another way is [memoization](#memoization) (not _memorization_). Tail-recursive memoization is possible but not necessary. A tail-recursive Fibonacci easy and blazingly fast:
+
+```{code-cell} ipython3
+DEFINE('fib_iter',
+       Λ(lambda π:
+         Λ(lambda π: π.b if π.n < 1 else 
+           π.f(π.b, π.a + π.b, π.n - 1),
+           ['a', 'b', 'n'], π),
+         ['f']));
+```
+
+Check it:
+
+```{code-cell} ipython3
+LOOP3(ΓΠ.fib_iter)(0, 1, 23)
+```
+
+Time it:
+
+```{code-cell} ipython3
+timeit(LOOP3(ΓΠ.fib_iter)(0, 1, 23))
+```
+
+4000 times faster. Stress it:
+
+```{code-cell} ipython3
+LOOP3(ΓΠ.fib_iter)(0, 1, 5000)
+```
+
+# Memoized [sic] Fibonacci<a id="memoization"></a>
+
++++
+
+## Curried Memo Table
+
++++
+
+One way to pass a memo table is through a Curried second argument. We'll need $\Upsilon2C$, generic for 2-parameter, Curried business code:
 
 ```{code-cell} ipython3
 DEFINE('Υ2C', 
@@ -631,7 +673,7 @@ DEFINE('Υ2C',
          ['d']));
 ```
 
-The domain code for a memoized, Curried Fibonacci follows. The parameter `a` is the _accumulator_, _associator_, or memo, whatever word you like best.
+The domain code for a memoized, Curried Fibonacci follows. The parameter `a` is the _accumulator_, _associator_, or memo, whatever word you like best. This is easiest to read (and to write) from the bottom up. It looks horrendous, but it isn't really.
 
 ```{code-cell} ipython3
 DEFINE('fib_fast',
@@ -640,30 +682,33 @@ DEFINE('fib_fast',
            Λ(lambda π: # of n; level 3
              (π.a, 1) if π.n < 2 else
              Λ(lambda π: # of n_1; level 4
+               (π.a, π.a[π.n_1]) # optimizer should remove these two lines
+               if π.n_1 in π.a else # ^^^
                Λ(lambda π: # of fim1; level 5
                  Λ(lambda π: # of m1; level 6
                    Λ(lambda π: # of r1; level 7
                      Λ(lambda π: # of a1; level 8
                        Λ(lambda π: # of n_2; level 9
-                         (π.a1, π.r1 + π.a1[π.n_2]) if π.n_2 in π.a1 else 
+                         (π.a1, π.r1 + π.a1[π.n_2]) # <~~~ a quick exit
+                         if π.n_2 in π.a1 else 
                          Λ(lambda π: # of fim2; level 10
                            Λ(lambda π: # of m2; level 11
                              Λ(lambda π: # of r2; level 12
                                Λ(lambda π: # of a2; level 13
-                                 (π.a2, π.r1 + π.r2), 
-                                 ['a2'], π)(π.m2[0] | {π.n_2: π.r2}), 
-                               ['r2'], π)(π.m2[1]), 
-                             ['m2'], π)(π.fim2(π.n_2)), 
-                           ['fim2'], π)(π.f(π.a1)), 
-                         ['n_2'], π)(π.n - 2),
-                       ['a1'], π)(π.m1[0] | {π.n_1: π.r1}),
-                     ['r1'], π)(π.m1[1]),
-                   ['m1'], π)(π.fim1(π.n_1)),
-                 ['fim1'], π)(π.f(π.a)),
-               ['n_1'], π)(π.n - 1), 
-             ['n'], π), 
-           ['a'], π),
-         ['f']))
+                                 (π.a2, π.r1 + π.r2), # <~~~ the money line
+                                 ['a2'], π)(π.m2[0] | {π.n_2: π.r2}),  # <~~~ update memo
+                               ['r2'], π)(π.m2[1]), # unpack
+                             ['m2'], π)(π.fim2(π.n_2)), # unpack
+                           ['fim2'], π)(π.f(π.a1)), # <~~~ recurse
+                         ['n_2'], π)(π.n - 2), # DRY
+                       ['a1'], π)(π.m1[0] | {π.n_1: π.r1}), # <~~~ update memo
+                     ['r1'], π)(π.m1[1]), # unpack
+                   ['m1'], π)(π.fim1(π.n_1)), # unpack
+                 ['fim1'], π)(π.f(π.a)), # <~~~ recurse
+               ['n_1'], π)(π.n - 1), # DRY
+             ['n'], π), # business parameter
+           ['a'], π), # curried memo
+         ['f'])) # domain code 
 ΓΠ.Υ2C(ΓΠ.fib_fast)({})(23)[1]
 ```
 
@@ -687,32 +732,11 @@ except RecursionError as e:
     print(e.args)
 ```
 
-... then write an $\Upsilon2$ and a  `LOOP2` according to the pattern set above.
+## Memo Table as Business Parameter
 
-```{code-cell} ipython3
-DEFINE('Υ2', 
-       Λ(lambda π: # of d, the domain code ...
-         Λ(lambda π: π.g(π.g), ['g'], π)(
-             # of business code of two parameters
-             Λ(lambda π: π.d(Λ(lambda π: π.sf(π.sf)(π.m, π.c), 
-                               ['m', 'c'], π)), 
-               ['sf'], π)), 
-         ['d']));
++++
 
-def LOOP2(d: Procedure) -> Procedure:
-    """in sincere flattery of Clojure, and thanks to Thomas Baruchel."""
-    DEFINE('Ρ2', Λ(lambda π: RECUR(π.m, π.c), ['m', 'c']));
-    def looper(*args):
-        """Expression form of a while-loop statement."""
-        while True:
-            try: 
-                print({"LOOP2": args})
-                return d(ΓΠ.Ρ2)(*args)
-            except TailCall as e:
-                args = e.args
-    result = Λ(lambda π: looper(π.m, π.c), ['m', 'c'], π=d.π)
-    return result
-```
+Currying is useful in general, but complicates this case. Get rid of it.
 
 ```{code-cell} ipython3
 DEFINE('fib_fast_uncurried',
@@ -725,33 +749,42 @@ DEFINE('fib_fast_uncurried',
                 Λ(lambda π: # of r1; level 6
                   Λ(lambda π: # of a1; level 7
                     Λ(lambda π: # of n_2; level 8
-                      (π.a1, π.r1 + π.a1[π.n_2]) if π.n_2 in π.a1 else 
+                      (π.a1, π.r1 + π.a1[π.n_2]) # <~~~ quick exit
+                      if π.n_2 in π.a1 else 
                       Λ(lambda π: # of t_2; level 9
                         Λ(lambda π: # of m_2; level 10
                           Λ(lambda π: # of r_2; level 11
                             Λ(lambda π: # of a_2; level 12
-                              (π.a2, π.r1 + π.r2),
-                              ['a2'], π)(π.m2 | {π.n_2: π.r2}), 
-                            ['r2'], π)(π.t2[1]), 
-                          ['m2'], π)(π.t2[0]), 
-                        ['t2'], π)(π.f(π.a1, π.n_2)), 
-                      ['n_2'], π)(π.n - 2), 
-                    ['a1'], π)(π.m1 | {π.n_1: π.r1}), 
-                  ['r1'], π)(π.t1[1]), 
-                ['m1'], π)(π.t1[0]),
-              ['t1'], π)(π.f(π.a, π.n_1)),
-            ['n_1'], π)(π.n - 1),
-          ['a', 'n'], π), 
-        ['f']));
+                              (π.a2, π.r1 + π.r2), # <~~~ the money line
+                              ['a2'], π)(π.m2 | {π.n_2: π.r2}), # <~~~ update memo
+                            ['r2'], π)(π.t2[1]), # nupaci
+                          ['m2'], π)(π.t2[0]), # unpack
+                        ['t2'], π)(π.f(π.a1, π.n_2)), # <~~~ recurse
+                      ['n_2'], π)(π.n - 2), # dry
+                    ['a1'], π)(π.m1 | {π.n_1: π.r1}), # <~~~ update memo
+                  ['r1'], π)(π.t1[1]), # unpac
+                ['m1'], π)(π.t1[0]), # unpack
+              ['t1'], π)(π.f(π.a, π.n_1)), # <~~~ recurse
+            ['n_1'], π)(π.n - 1), # DRY
+          ['a', 'n'], π), # busines parameters
+        ['f'])); # domain-code signature
 ```
 
-```{code-cell} ipython3
-LOOP2(ΓΠ.fib_fast_uncurried)({}, 3)[1]
-```
+Need $\Upsilon2$ to call it:
 
 ```{code-cell} ipython3
-ΓΠ.Υ2(ΓΠ.fib_fast_uncurried)({}, 2)[1]
+DEFINE('Υ2', 
+       Λ(lambda π: # of d, the domain code ...
+         Λ(lambda π: π.g(π.g), ['g'], π)(
+             # of business code of two parameters
+             Λ(lambda π: 
+               π.d(Λ(lambda π: π.sf(π.sf)(π.m, π.c), 
+                     ['m', 'c'], π)), 
+               ['sf'], π)), 
+         ['d']));
 ```
+
+The recursion limit is a little higher, but we don't want any of that.
 
 ```{code-cell} ipython3
 try:
@@ -765,17 +798,9 @@ except RecursionError as e:
     print(e.args)
 ```
 
-```{code-cell} ipython3
-try:
-    print(LOOP2(ΓΠ.fib_fast_uncurried)({}, 246))
-except RecursionError as e:
-    print(e.args)
-    
-try:
-    print(LOOP2(ΓΠ.fib_fast_uncurried)({}, 245))
-except RecursionError as e:
-    print(e.args)
-```
+Section [Tail-Recursive Fibonacci](#tail-recursive-fibonacci) exhibits a very short solution without a memo table. Could we write a tail-recursive version with a memo table? Is it worth the effort? Perhaps as a mental exercise.
+
++++
 
 # Junkyard
 
