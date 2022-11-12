@@ -485,7 +485,9 @@ DEFINE('Υ1',
        Λ(lambda π: # function of domain code, d
          Λ(lambda π: π.g(π.g), ['g'], π)(
              # of business code of one parameter
-             Λ(lambda π: π.d(Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)),
+             Λ(lambda π: π.d(
+                 Λ(lambda π: π.sf(π.sf)(π.m), 
+                   ['m'], π)),
                ['sf'], π)), 
          ['d']))
 
@@ -510,8 +512,9 @@ DEFINE('Υ3',
        Λ(lambda π: # of d, the domain code ...
          Λ(lambda π: π.g(π.g), ['g'], π)(
              # of business code of three parameters
-             Λ(lambda π: π.d(Λ(lambda π: π.sf(π.sf)(π.m, π.c, π.x), 
-                               ['m', 'c', 'x'], π)), 
+             Λ(lambda π: π.d(
+                 Λ(lambda π: π.sf(π.sf)(π.m, π.c, π.x), 
+                   ['m', 'c', 'x'], π)), 
                ['sf'], π)), 
          ['d']));
 ```
@@ -798,9 +801,95 @@ except RecursionError as e:
     print(e.args)
 ```
 
+## Recursive With Memo
+
++++
+
 Section [Tail-Recursive Fibonacci](#tail-recursive-fibonacci) exhibits a very short solution without a memo table. Could we write a tail-recursive version with a memo table? Is it worth the effort? Perhaps as a mental exercise.
 
 +++
+
+Pseudocode:
+
++++
+
+```
+f(r1, r2, a, n, x):
+    (a, 1) if n < 1 else
+    f(r2, r1 + r2, a | {x - (n-1): r1, x - (n-2): r2}, x)
+```
+
++++
+
+### Non-Tail-Recursive
+
+```{code-cell} ipython3
+DEFINE('Υ5', 
+       Λ(lambda π: # of d, the domain code ...
+         Λ(lambda π: π.g(π.g), ['g'], π)(
+             # of business code of five parameters
+             Λ(lambda π: π.d(
+                 Λ(lambda π: π.sf(π.sf)(π.m, π.c, π.x, π.a, π.b), 
+                   ['m', 'c', 'x', 'a', 'b'], π)), 
+               ['sf'], π)), 
+         ['d']));
+```
+
+```{code-cell} ipython3
+DEFINE('fib_tc_memo',
+      Λ(lambda π: 
+        Λ(lambda π:
+          (π.a | {π.x: π.r2}, π.r2) if π.n < 1 else \
+          π.f(π.r2, π.r1 + π.r2, 
+              π.a | {π.x-1-(π.n-1): π.r2},
+              π.n - 1,
+              π.x),
+         ['r1', 'r2', 'a', 'n', 'x'], π), 
+        ['f']));
+```
+
+```{code-cell} ipython3
+ΓΠ.Υ5(ΓΠ.fib_tc_memo)(0, 1, {}, 23, 23)
+```
+
+### Tail-Recusive
+
+```{code-cell} ipython3
+def LOOP5(d: Procedure) -> Procedure:
+    """in sincere flattery of Clojure, and thanks to Thomas Baruchel."""
+    DEFINE('Ρ3', Λ(lambda π: 
+                   RECUR(π.m, π.c, π.x, π.a, π.b), 
+                   ['m', 'c', 'x', 'a', 'b']));
+    def looper(*args):
+        """Expression form of a while-loop statement."""
+        while True:
+            try: 
+                return d(ΓΠ.Ρ3)(*args)
+            except TailCall as e:
+                args = e.args
+    result = Λ(lambda π: 
+               looper(π.m, π.c, π.x, π.a, π.b), 
+               ['m', 'c', 'x', 'a', 'b'], π=d.π)
+    return result
+```
+
+```{code-cell} ipython3
+LOOP5(ΓΠ.fib_tc_memo)(0, 1, {}, 23, 23)
+```
+
+### Test the Limits
+
+```{code-cell} ipython3
+try:
+    print(ΓΠ.Υ5(ΓΠ.fib_tc_memo)(0, 1, {}, 500, 500)[1])
+except RecursionError as e:
+    print(e.args)
+    
+try:
+    print(LOOP5(ΓΠ.fib_tc_memo)(0, 1, {}, 500, 500)[1])
+except RecursionError as e:
+    print(e.args)
+```
 
 # Junkyard
 
