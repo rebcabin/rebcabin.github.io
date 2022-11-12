@@ -631,29 +631,25 @@ DEFINE('Υ2C',
          ['d']));
 ```
 
-The domain code for a memoized Fibonacci follows. The parameter `a` is the _accumulator_, _associator_, or memo, whatever word you like best.
-
-```{raw-cell}
-Λ(lambda π: ..., [''], π)()
-```
+The domain code for a memoized, Curried Fibonacci follows. The parameter `a` is the _accumulator_, _associator_, or memo, whatever word you like best.
 
 ```{code-cell} ipython3
 DEFINE('fib_fast',
-       Λ(lambda π: # of f
-         Λ(lambda π: # of a
-           Λ(lambda π: # of n
+       Λ(lambda π: # of f, level 1
+         Λ(lambda π: # of a, level 2
+           Λ(lambda π: # of n, level 3
              (π.a, 1) if π.n < 2 else
-             Λ(lambda π: # of n_1
-               Λ(lambda π: # of fim1
-                 Λ(lambda π: # of m1
-                   Λ(lambda π: # of r1
-                     Λ(lambda π: # of a1
-                       Λ(lambda π: # of n_2
+             Λ(lambda π: # of n_1, level 4
+               Λ(lambda π: # of fim1, level 5
+                 Λ(lambda π: # of m1, level 6
+                   Λ(lambda π: # of r1, level 7
+                     Λ(lambda π: # of a1, level 8
+                       Λ(lambda π: # of n_2, level 9
                          (π.a1, π.r1 + π.a1[π.n_2]) if π.n_2 in π.a1 else 
-                         Λ(lambda π: # of fim2
-                           Λ(lambda π: # of m2
-                             Λ(lambda π: # of r2
-                               Λ(lambda π: # of a2
+                         Λ(lambda π: # of fim2, level 10
+                           Λ(lambda π: # of m2, level 11
+                             Λ(lambda π: # of r2, level 12
+                               Λ(lambda π: # of a2, level 13
                                  (π.a2, π.r1 + π.r2), 
                                  ['a2'], π)(π.m2[0] | {π.n_2: π.r2}), 
                                ['r2'], π)(π.m2[1]), 
@@ -689,21 +685,6 @@ try:
     print(ΓΠ.Υ2C(ΓΠ.fib_fast)({})(184)[1])
 except RecursionError as e:
     print(e.args)
-```
-
-```{code-cell} ipython3
-def LOOP2C(d: Procedure) -> Procedure:
-    """in sincere flattery of Clojure, and thanks to Thomas Baruchel."""
-    DEFINE('Ρ2C', Λ(lambda π: RECUR(π.m, π.c, π.x), ['a']));
-    def looper(*args):
-        """Expression form of a while-loop statement."""
-        while True:
-            try: 
-                return d(ΓΠ.Ρ3)(*args)
-            except TailCall as e:
-                args = e.args
-    result = Λ(lambda π: looper(π.m, π.c, π.x), ['m', 'c', 'x'], π=d.π)
-    return result
 ```
 
 # Junkyard
