@@ -255,7 +255,7 @@ setattr(
 work in progress
 
 ```{code-cell} ipython3
-from typing import Any
+from typing import Any, Dict, Tuple, List
 def EVAL(expr: Any, π: Environment=ΓΠ) -> Any:
     """Python does almost all this for us."""
     if isinstance(expr, int) or \
@@ -264,6 +264,12 @@ def EVAL(expr: Any, π: Environment=ΓΠ) -> Any:
        isinstance(expr, bool):
         result = expr
     elif isinstance(expr, Procedure):
+        result = expr
+    elif isinstance(expr, Dict):
+        # for memo tables:
+        result = expr
+    elif isinstance(expr, Tuple):
+        # for memoized, curried functions
         result = expr
     else:
         raise ValueError
@@ -398,7 +404,7 @@ Anonymously:
 Λ(lambda π: π.f, ['f'])(Λ(lambda π: π.x * π.x, ['x']))(42)
 ```
 
-## Square Roots of Functions
+## $\Upsilon$: Squaring Square Roots of Functions
 
 +++
 
@@ -448,18 +454,43 @@ Abstract into `d` the _domain code_, a function of `f`, the _business code_, a f
 Abstract into `g` the self-application of the function of the square root, the function of `sf`.
 
 ```{code-cell} ipython3
-Λ(lambda π: # of d
+Λ(lambda π: # function of domain code, d
   Λ(lambda π: π.g(π.g), ['g'], π)(
       Λ(lambda π: π.d(Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)),
         ['sf'], π)), 
   ['d'])(
-    Λ(lambda π: # of f
-      Λ(lambda π: 1 if π.n < 1 else π.n * π.f(π.n - 1), ['n'], π), 
-      ['f'])
+    Λ(lambda π: # domain code; function of business code, f
+      Λ(lambda π: 1 if π.n < 1 else π.n * π.f(π.n - 1), 
+        ['n'], π), # business parameter, n
+      ['f']) # recursive function
 )(6)
 ```
 
-## Iterative Factorial via $\Upsilon$
+## Recursive Factorial via $\Upsilon{}1$
+
++++
+
+Package into a system function, $\Upsilon{}1$, for later use. The "1" in the name means that this combinator is for domain codes that return business codes of one parameter:
+
+```{code-cell} ipython3
+DEFINE('Υ1', 
+       Λ(lambda π: # function of domain code, d
+         Λ(lambda π: π.g(π.g), ['g'], π)(
+             # of business code of one parameter
+             Λ(lambda π: π.d(Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)),
+               ['sf'], π)), 
+         ['d']))
+
+DEFINE('fact_recursive',
+      Λ(lambda π: # domain code; function of business code, f
+        Λ(lambda π: 1 if π.n < 1 else π.n * π.f(π.n - 1), 
+          ['n'], π), # business parameter, n
+        ['f'])) # recursive function
+
+ΓΠ.Υ1(ΓΠ.fact_recursive)(6)
+```
+
+## Iterative Factorial via $\Upsilon{}3$
 
 +++
 
@@ -468,11 +499,12 @@ The thing that looks like "Y" below is actually capital Upsilon ($\Upsilon$ in $
 ```{code-cell} ipython3
 # λ d: (λ g: g[g])(λ sf: d[λ m, c, x: sf[sf][m, c, x]]) 
 DEFINE('Υ3', 
-       Λ(lambda π: # of d, the domain code
+       Λ(lambda π: # of d, the domain code ...
          Λ(lambda π: π.g(π.g), ['g'], π)(
-           Λ(lambda π: π.d(Λ(lambda π: π.sf(π.sf)(π.m, π.c, π.x), 
-                   ['m', 'c', 'x'], π)), 
-             ['sf'], π)), 
+             # of business code of three parameters
+             Λ(lambda π: π.d(Λ(lambda π: π.sf(π.sf)(π.m, π.c, π.x), 
+                               ['m', 'c', 'x'], π)), 
+               ['sf'], π)), 
          ['d']));
 ```
 
@@ -484,8 +516,8 @@ User-level domain code, redefining `fact_iter`. Any domain code is a function of
 
 ```{code-cell} ipython3
 # λ f: λ m, c, x: m if c > x else f(m*c, c+1, x)
-DEFINE('fact_iter', # domain code ...
-       Λ(lambda π: # ... function of f, which is business code.
+DEFINE('fact_iter', # domain code is a function of f ...
+       Λ(lambda π: # ... which is business code.
          Λ(lambda π: π.m if π.c > π.x else 
            π.f(π.m * π.c, π.c + 1, π.x), # business code
            ['m', 'c', 'x'], π), # business parameters
@@ -500,31 +532,31 @@ DEFINE('fact_iter', # domain code ...
 
 +++
 
-Thanks to [Thomas Baruchel for this idea on tail recursion](https://stackoverflow.com/questions/13591970/does-python-optimize-tail-recursion). If users are aware that their domain code is tail-recursive, then they may call it as follows instead of through $\Upsilon$. In Scheme, tail recursion is the default, but in Python and Schemulator, users must manage it explicitly. This isn't a terrible issue, tail-calls are lexically obvious. Clojure does likewise, where users must explicitly write `loop` and `recur`.
+Thanks to [Thomas Baruchel for this idea on tail recursion](https://stackoverflow.com/questions/13591970/does-python-optimize-tail-recursion). If users are aware that their domain code is tail-recursive, then they may call it as follows instead of through $\Upsilon$. In Scheme, tail recursion is the default, but in Python and Schemulator, users must manage tail recursion explicitly. This isn't a terrible issue, tail-calls are lexically obvious, so users should always know. Clojure does likewise, where users must explicitly write `loop` and `recur`. In any event, domain code can always be called via the proper $\Upsilon$, the one that knows the actual argument count. 
 
 +++
 
-The thing that looks like "P" below is Greek Capital Rho for "recur" and "B" is Greek Capital Beta for "Baruchel." B has the same signature as $\Upsilon$; it takes a _domain code_ as its sole argument. Names in user code should not collide with P and B if users remember that they should [avoid Greek in user code](#greek). As with $\Upsilon$, Rho must know its number of arguments. That's OK for now (TODO: reconsider).
+We imitate Clojure's names `loop` and `recur`. The thing that looks like "P" below is Greek Capital Rho for "recur." `LOOP3` has the same signature as $\Upsilon3$; it takes domain code as its sole argument. Names in user code should not collide with P B if users remember that they should [avoid Greek in user code](#greek). As with $\Upsilon$, Rho and `LOOP` must know their argument counts. That's OK for now (TODO: reconsider).
 
 ```{code-cell} ipython3
 class TailCall(Exception):  
     """αναδρομική κλήση"""
     def __init__(self, *args):
+        """Overwrite old args with new."""
         self.args = args
 
 def RECUR(*args):  
     """υψώνω: in sincere flattery of Clojure"""
     raise TailCall(*args)
 
-DEFINE('Ρ3', Λ(lambda π: RECUR(π.m, π.c, π.x), ['m', 'c', 'x']))
-        
 def LOOP3(d: Procedure) -> Procedure:
-    """in sincere flattery of Clojure"""
+    """in sincere flattery of Clojure, and thanks to Thomas Baruchel."""
+    DEFINE('Ρ3', Λ(lambda π: RECUR(π.m, π.c, π.x), ['m', 'c', 'x']));
     def looper(*args):
         """Expression form of a while-loop statement."""
         while True:
             try: 
-                return d(ΓΠ.Ρ3)(*args)  # experimental 'call' syntax
+                return d(ΓΠ.Ρ3)(*args)
             except TailCall as e:
                 args = e.args
     result = Λ(lambda π: looper(π.m, π.c, π.x), ['m', 'c', 'x'], π=d.π)
@@ -532,6 +564,10 @@ def LOOP3(d: Procedure) -> Procedure:
 
 LOOP3(ΓΠ.fact_iter)(1, 1, 6)  # <~~~ DON'T DO THIS, even though it works
 ```
+
+Results are undefined if you call any `LOOP` function with non-tail-recursive domain code.
+
++++
 
 ## Prove It
 
@@ -553,6 +589,121 @@ try:
     print(LOOP3(ΓΠ.fact_iter)(1, 1, 371))
 except RecursionError as e:
     print(e.args)
+```
+
+# Memoization [sic]
+
++++
+
+Write domain code for catastropically slow, non-tail-recursive, exponentially diverging Fibonacci:
+
+```{code-cell} ipython3
+DEFINE('fib_slow', 
+       Λ(lambda π: 
+         Λ(lambda π: 1 if π.n < 2 else π.f(π.n - 1) + π.f(π.n - 2), ['n'], π),
+         ['f']))
+
+ΓΠ.Υ1(ΓΠ.fib_slow)(6)
+```
+
+This is miserable even for $n=23$. You won't want to call it for bigger arguments. 
+
+```{code-cell} ipython3
+ΓΠ.Υ1(ΓΠ.fib_slow)(23)
+```
+
+```{code-cell} ipython3
+timeit(ΓΠ.Υ1(ΓΠ.fib_slow)(23))
+```
+
+To pass a memo table, we'll need $\Upsilon2C$, which is generic for 2-parameter, Curried business code:
+
+```{code-cell} ipython3
+DEFINE('Υ2C', 
+       Λ(lambda π: # function of domain code, d ...
+         Λ(lambda π: π.g(π.g), ['g'], π)(
+             # with business code of 2 parameters
+             Λ(lambda π: 
+               π.d(Λ(lambda π: 
+                     Λ(lambda π: π.sf(π.sf)(π.m)(π.n), 
+                       ['n'], π), ['m'], π)),
+               ['sf'], π)), 
+         ['d']));
+```
+
+The domain code for a memoized Fibonacci follows. The parameter `a` is the _accumulator_, _associator_, or memo, whatever word you like best.
+
+```{raw-cell}
+Λ(lambda π: ..., [''], π)()
+```
+
+```{code-cell} ipython3
+DEFINE('fib_fast',
+       Λ(lambda π: # of f
+         Λ(lambda π: # of a
+           Λ(lambda π: # of n
+             (π.a, 1) if π.n < 2 else
+             Λ(lambda π: # of n_1
+               Λ(lambda π: # of fim1
+                 Λ(lambda π: # of m1
+                   Λ(lambda π: # of r1
+                     Λ(lambda π: # of a1
+                       Λ(lambda π: # of n_2
+                         (π.a1, π.r1 + π.a1[π.n_2]) if π.n_2 in π.a1 else 
+                         Λ(lambda π: # of fim2
+                           Λ(lambda π: # of m2
+                             Λ(lambda π: # of r2
+                               Λ(lambda π: # of a2
+                                 (π.a2, π.r1 + π.r2), 
+                                 ['a2'], π)(π.m2[0] | {π.n_2: π.r2}), 
+                               ['r2'], π)(π.m2[1]), 
+                             ['m2'], π)(π.fim2(π.n_2)), 
+                           ['fim2'], π)(π.f(π.a1)), 
+                         ['n_2'], π)(π.n - 2),
+                       ['a1'], π)(π.m1[0] | {π.n_1: π.r1}),
+                     ['r1'], π)(π.m1[1]),
+                   ['m1'], π)(π.fim1(π.n_1)),
+                 ['fim1'], π)(π.f(π.a)),
+               ['n_1'], π)(π.n - 1), 
+             ['n'], π), 
+           ['a'], π),
+         ['f']))
+ΓΠ.Υ2C(ΓΠ.fib_fast)({})(23)[1]
+```
+
+1,000 times faster
+
+```{code-cell} ipython3
+timeit(ΓΠ.Υ2C(ΓΠ.fib_fast)({})(23)[1])
+```
+
+But still blows the recursion limit:
+
+```{code-cell} ipython3
+try:
+    print(ΓΠ.Υ2C(ΓΠ.fib_fast)({})(185)[1])
+except RecursionError as e:
+    print(e.args)
+
+try:
+    print(ΓΠ.Υ2C(ΓΠ.fib_fast)({})(184)[1])
+except RecursionError as e:
+    print(e.args)
+```
+
+```{code-cell} ipython3
+def LOOP2C(d: Procedure) -> Procedure:
+    """in sincere flattery of Clojure, and thanks to Thomas Baruchel."""
+    DEFINE('Ρ2C', Λ(lambda π: RECUR(π.m, π.c, π.x), ['a']));
+    def looper(*args):
+        """Expression form of a while-loop statement."""
+        while True:
+            try: 
+                return d(ΓΠ.Ρ3)(*args)
+            except TailCall as e:
+                args = e.args
+    result = Λ(lambda π: looper(π.m, π.c, π.x), ['m', 'c', 'x'], π=d.π)
+    return result
 ```
 
 # Junkyard
