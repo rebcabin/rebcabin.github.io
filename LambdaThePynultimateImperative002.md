@@ -159,6 +159,7 @@ TODO: Coalesce $\Gamma\Pi$ with Python's global environment.
 ```{code-cell} ipython3
 from dataclasses import dataclass, field
 from types import FunctionType
+from typing import Any
 @dataclass
 class Environment:
     """Set attributes via settattr(env.ϕ, key, val). When getting
@@ -166,16 +167,22 @@ class Environment:
     __getattr__."""
     ϕ: FunctionType   # "frame," also nice place to hang attributes via 'setattr'
     π: "Environment"  # via Greek πηρι, short name for 'enclosing'
-    def __getattr__(self, key):
-        """recursive lookup"""
+    def _get_it(self, key: str) -> Any:
+        "recursive lookup"
         try:
-            result = getattr(self.ϕ, key)
+            ρ = getattr(self.ϕ, key)
         except AttributeError as _:
             if self.π is None:
                 raise NameError(f'Name {key} is unbound.')
             else:  # recurse
-                result = self.π.__getattr__(key)
-        return result
+                ρ = self.π.__getattr__(key)
+        return ρ
+    def __getattr__(self, key: str) -> Any:
+        """recursive lookup by dot notation"""
+        return self._get_it(key)
+    def __getitem__(self, key: str) -> Any:
+        """recursive lookup by bracket notation"""
+        return self._get_it(key)
 # diverges because it calls __getattr__ for 'self.ϕ'
 #    def __setattr__(self, key, val):
 #        setattr(getattr(self, 'ϕ'), key, val)
@@ -205,19 +212,18 @@ By default, procedures are defined in the unique global environment, $\Gamma\Pi$
 from typing import Dict, List, Tuple, Any
 Parameters = List[str]  # positional arguments only
 class Procedure: 
-    """forward reference; will overwrite in a minute."""
+    """forward reference; will be corrected."""
     pass
 def APPLY(proc: Procedure, 
           args: List[Any], 
-          π: Environment =ΓΠ) -> Any:
-    """forward reference; Will be redefined."""
+          π: Environment = ΓΠ) -> Any:
+    """forward reference; will be corrected."""
     print(args)
 @dataclass
 class Procedure:
     code: Dict  # TODO: Check for duplicated symbols in `parameters`.
     π: Environment=ΓΠ  # Defined in global environment by default.
     def __call__(self, *args):
-        """experimental"""
         return APPLY(self, args, self.π)
 ```
 
@@ -234,7 +240,7 @@ setattr(
 ΓΠ.square(5, 6)
 ```
 
-## $\Lambda$
+## $\Lambda$($\lambda$, params, $\pi$)
 
 +++
 
@@ -244,10 +250,10 @@ Some syntactical help for anonymous procedures. Default parameter list is empty 
 def Λ(body: FunctionType, 
       parameters: List[str] = [],  # default empty
       π = ΓΠ) -> Procedure:        # default global
-    result = Procedure(
+    ρ = Procedure(
         code={"body": body, "parameters": parameters}, 
         π=π)
-    return result
+    return ρ
 ```
 
 ```{code-cell} ipython3
@@ -259,37 +265,85 @@ setattr(
 ΓΠ.square(5, 6)
 ```
 
-## EVAL
+# Application
+
++++
+
+In $\lambda$-calculus, an _Application_ is an unevaluated list with a Procedure or symbol (`str`) in the first slot and unevaluated actual arguments in the remaining positions. 
+
+```{code-cell} ipython3
+from typing import Union, Any
+@dataclass
+class Application():
+    head: Union[str, Procedure]
+    args: List[Any]
+    π: Environment = ΓΠ
+```
+
+# QUOTE, QUASIQUOTE, UNQUOTE
+
++++
+
+TODO
+
++++
+
+## EVAL(expr, $\pi$)
 
 +++
 
 work in progress
 
++++
+
+`EVAL` calls `APPLY` for Applications. But `APPLY` calls `EVAL` on all arguments, so we must refer to the earlier forward reference for `APPLY` before defining `EVAL`. We get to test this after [`APPLY` is corrected, below](#apply).
+
+```{code-cell} ipython3
+def EVAL_APPLICATION(expr: Application, π: Environment = ΓΠ) -> Any:
+    if isinstance(expr.head, str):
+        head = EVAL(expr.π[expr.head], expr.π)
+        assert isinstance(head, Procedure), \
+            f'The head of {expr} must be a string or a Procedure, ' \
+            f'not a {expr.head}'
+    elif isinstance(expr.head, Procedure): 
+        head = expr.head
+    else:
+        raise ValueError(
+            f'The head of {expr} must be a string or a Procedure, '
+            f'not a {expr.head}')
+    eargs = [EVAL(arg, π) for arg in expr.args]
+    ρ = APPLY(head, eargs, π)
+    return ρ
+```
+
 ```{code-cell} ipython3
 from typing import Any, Dict, Tuple, List
+
 def EVAL(expr: Any, π: Environment = ΓΠ) -> Any:
-    """Python does almost all this for us."""
+    """Python does a lot of this for us."""
     if isinstance(expr, int) or \
        isinstance(expr, float) or \
        isinstance(expr, str) or \
        isinstance(expr, bool):
-        result = expr
+        ρ = expr
     elif isinstance(expr, Procedure):
-        result = expr
+        ρ = expr
     elif isinstance(expr, Dict):
         # for memo tables:
-        result = expr
+        ρ = expr
     elif isinstance(expr, Tuple):
         # for memoized, curried functions
-        result = expr
+        ρ = expr
     elif expr is None:
-        result = None
+        ρ = None
+    elif isinstance(expr, Application):
+        ρ = EVAL_APPLICATION(expr, π)
     else:
-        raise ValueError(f'{expr} has unknown type {type(expr)}')
-    return result
+        raise ValueError(f'{expr} has unsupported type {type(expr)}')
+    return ρ
 ```
 
-## APPLY
+## APPLY(proc, args, $\pi$)<a id="apply"></a>
 
 +++
 
@@ -310,8 +364,8 @@ def APPLY(proc: Procedure,
     E1 = Environment(lambda: None, π)
     for k, v in zip(proc.code['parameters'], evaled_args):
         setattr(E1.ϕ, k, v)
-    result = proc.code['body'](E1)
-    return result
+    ρ = proc.code['body'](E1)
+    return ρ
     
 print(APPLY(ΓΠ.square, [5]))
 ```
@@ -328,7 +382,17 @@ Works on anonymous procedures, too:
 Λ(lambda π: π.x * π.x, ['x'])(5)
 ```
 
-## DEFINE
+### Test Application
+
+```{code-cell} ipython3
+EVAL(Application(ΓΠ.square, [5]))
+```
+
+```{code-cell} ipython3
+EVAL(Application('square', [42]))
+```
+
+## DEFINE(sym, val, $\pi$)
 
 +++
 
@@ -467,10 +531,28 @@ Return a fresh anonymous procedure rather than one bound to a global symbol as a
 (42)                             # Apply the returned procedure.
 ```
 
-## Procedures of No Arguments (Thunks)
+## THUNK: Procedure of No Arguments
 
 ```{code-cell} ipython3
 Λ(lambda π: 42)()
+```
+
+```{code-cell} ipython3
+def THUNK(body: Any,
+          π: Environment = ΓΠ) -> Procedure:
+    ρ = Λ(lambda π: 
+          EVAL(body, π=π), 
+          [], 
+          π=π)
+    return ρ
+```
+
+```{code-cell} ipython3
+THUNK(42)()
+```
+
+```{code-cell} ipython3
+APPLY(THUNK(42), [])
 ```
 
 ## $\Upsilon$: Squaring Square Roots of Functions
@@ -635,8 +717,8 @@ def LOOP3(d: Procedure) -> Procedure:
                 return d(ΓΠ.Ρ3)(*args)
             except TailCall as e:
                 args = e.args
-    result = Λ(lambda π: looper(π.m, π.c, π.x), ['m', 'c', 'x'], π=d.π)
-    return result
+    ρ = Λ(lambda π: looper(π.m, π.c, π.x), ['m', 'c', 'x'], π=d.π)
+    return ρ
 
 LOOP3(ΓΠ.fact_iter)(1, 1, 20)
 ```
@@ -936,10 +1018,10 @@ def LOOP5(d: Procedure) -> Procedure:
                 return d(ΓΠ.Ρ3)(*args)
             except TailCall as e:
                 args = e.args
-    result = Λ(lambda π: 
+    ρ = Λ(lambda π: 
                looper(π.m, π.c, π.x, π.a, π.b), 
                ['m', 'c', 'x', 'a', 'b'], π=d.π)
-    return result
+    return ρ
 ```
 
 ```{code-cell} ipython3
@@ -986,7 +1068,10 @@ except RecursionError as e:
 Tested below in [block](#block). Like Gambit and unlike Common Lisp and Emacs Lisp, we can only `set!` symbols that are already `define`d.
 
 ```{code-cell} ipython3
-def SET_BANG(sym: str, val: Any, π: Environment) -> None:
+def SET_BANG(
+        sym: str, 
+        val: Any, 
+        π: Environment = ΓΠ) -> None:
     ee = EVAL(val, π)
     """recursive lookup"""
     while π is not None:
@@ -1010,13 +1095,18 @@ Sequencing of statements and expressions is not fundamental. Instead, we must ch
 
 +++
 
-## Convention: Statements are 1-Thunks
+## 1-THUNK Convention: Statements are 1-Thunks
 
 +++
 
-In the logician's $\lambda$-calculus, all $\lambda$-forms take one parameter. In Schemulator, procedures of one parameter are ***1-Thunks***, just as procedures of no parameters are ***thunks***.
+In the logician's $\lambda$-calculus, all $\lambda$-forms take one parameter. In Schemulator, procedures of one parameter are ***1-Thunks***, just as procedures of no parameters are ***thunks***. We need to pass the output of one 1-thunk to the next 1-thunk so as to force time-order of execution to follow dependency order of argument evaluation by function application, i.e, to follow applicative-order semantics. Haskell calls such forcing "scheduling." That might be a bit of a heavy word for the forcing because there is no run-time scheduler: it's all done at compile time.
 
-+++
+```{code-cell} ipython3
+def THUNK1(body: Any,
+           π: Environment = ΓΠ):
+    ρ = Λ(lambda π: body, ['_'], π=π)
+    return ρ
+```
 
 Use `_` as a dummy parameter, as does Python.
 
@@ -1025,19 +1115,19 @@ Use `_` as a dummy parameter, as does Python.
 First, following the paper, we define a block of two statements.
 
 ```{code-cell} ipython3
-def BLOCK2(s1: Procedure, s2: Procedure) -> Any:
+def BLOCK2(s1: Procedure, 
+           s2: Procedure,
+           π: Environment = ΓΠ) -> Any:
     """Sequentially execute two statement-expressions."""
-    s2(s1(None))
+    APPLY(
+        s2,                      #      By applicative order:
+        [APPLY(s1, [None], π)],  # <~~~ inner is eval'ed first.
+        π)
     
-    
-BEGIN2 = BLOCK2
-
-
-# Λ(lambda π: ASSIGN('x', 6, π), ['ανδϵικϵλο'])(_)
-DEFINE('x', 0)
+DEFINE('x', 0)    
 BLOCK2(
     Λ(lambda π: SET_BANG('x', 6, π), ['_']), 
-    Λ(lambda π: print(π.x * 7), ['_']))             
+    Λ(lambda π: print(π.x * 7), ['_']))
 
 try:
     BLOCK2(
@@ -1048,12 +1138,22 @@ except NameError as e:
 ```
 
 ```{code-cell} ipython3
-def BLOCK(*ss: List[Procedure]) -> Any:
+def BLOCK(*ss: List[Procedure], 
+         π: Environment = ΓΠ) -> Any:
     intermediate = None
     for s in ss:
         if intermediate is not None:
-            intermediate = s(intermediate(None))
-        intermediate = s(None)
+            intermediate = APPLY(s, 
+                                 [APPLY(
+                                     intermediate,
+                                     [None],
+                                     π=π)],
+                                 π=π)
+        intermediate = APPLY(s, [None], π)
+
+BLOCK(
+    Λ(lambda π: SET_BANG('x', 6, π), ['_']), 
+    Λ(lambda π: print(π.x * 7), ['_']))
 
 DEFINE('x', 0)
 DEFINE('y', 42)
@@ -1061,6 +1161,19 @@ BLOCK(
     Λ(lambda π: SET_BANG('x', 6, π), ['_']), 
     Λ(lambda π: SET_BANG('x', π.x * 7, π), ['_']),
     Λ(lambda π: print(π.x * π.y), ['_']))
+
+try:
+    BLOCK(
+        Λ(lambda π: SET_BANG('x', 6, π), ['_']), 
+        Λ(lambda π: SET_BANG('x', π.x * 7, π), ['_']),
+        Λ(lambda π: print(π.x * π.y), ['_']),
+        Λ(lambda π: π.z, ['_']))
+except NameError as e:
+    print(e.args)
+```
+
+```{code-cell} ipython3
+BEGIN = BLOCK
 ```
 
 # LET*, LET, LETREC
@@ -1069,18 +1182,34 @@ BLOCK(
 
 `LET_STAR` is sequential binding of locals. `LET` is parallel binding. `LETREC` is mutually recursive `LET`.
 
++++
+
+To start, let's say that `body` must be a thunk. 
+
++++
+
+TODO: This choice may lead to redesign of `EVAL`.
+
 ```{code-cell} ipython3
 def LET_STAR(
         binding_pairs: List[Tuple[str, Any]], 
         body: Any, 
         π: Environment = ΓΠ) -> Any:
     if len(binding_pairs) == 1:
-        ρ = APPLY(body, [], π=π)
+        k, v = binding_pairs[0]
+        ρ = APPLY(
+            Λ(lambda π: body,
+              [k],
+              π=π),
+            [v], 
+            π=π)
         return ρ
+    else:
+        pass
     
-LET_STAR([('x', 42)], 
-         Λ(lambda π: 
-           ΓΠ.square(π.x)))
+LET_STAR([('z', 42)], 
+           Λ(lambda π:
+             ΓΠ.square(π.z)))()
 ```
 
 # COND
