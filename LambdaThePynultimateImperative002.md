@@ -58,7 +58,7 @@ We follow the paper more-or-less directly, with gleanings from [SICP](https://sa
 
 +++
 
-Ideally, we'd compile Python into Scheme or Clojure or Common Lisp, then write transformations, translations, interpreters, debuggers, etc. in Scheme or Clojure or Common Lisp. However, to maintain a convenient notebook structure and to avoid creeping dependencies, we'll just model Python imperatives in a Scheme-like applicative-order $\lambda$ calculus embedded in basic Python.
+Ideally, we'd compile Python into Scheme or Clojure or Common Lisp, then write transformations, translations, interpreters, debuggers, etc. in Scheme or Clojure or Common Lisp. However, to maintain a convenient notebook structure and to avoid creeping dependencies, we'll just model Python imperatives in a Scheme-like applicative-order $\lambda$-calculus embedded in basic Python.
 
 +++
 
@@ -180,8 +180,12 @@ class Environment:
 #    def __setattr__(self, key, val):
 #        setattr(getattr(self, 'ϕ'), key, val)
 #        setattr(self.ϕ, key, val)
-# The ugliness of 'setattr' is hidden in DEFINE.
-    
+# The ugliness of 'setattr' is hidden in DEFINE.    
+```
+
+# Unique Global Environment $\Gamma\Pi$
+
+```{code-cell} ipython3
 ΓΠ = Environment(lambda: None, None)  # Γ for "global," Π for "environment"
 setattr(ΓΠ.ϕ, 'γόὂ', 43)
 ΓΠ.γόὂ
@@ -198,9 +202,14 @@ A ___procedure___ is a pair of code and environment. ___Code___ is a dictionary 
 By default, procedures are defined in the unique global environment, $\Gamma\Pi$.
 
 ```{code-cell} ipython3
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 Parameters = List[str]  # positional arguments only
-def APPLY(proc, args, π=ΓΠ):
+class Procedure: 
+    """forward reference; will overwrite in a minute."""
+    pass
+def APPLY(proc: Procedure, 
+          args: List[Any], 
+          π: Environment =ΓΠ) -> Any:
     """forward reference; Will be redefined."""
     print(args)
 @dataclass
@@ -229,10 +238,12 @@ setattr(
 
 +++
 
-Some syntactical help for anonymous procedures:
+Some syntactical help for anonymous procedures. Default parameter list is empty and default parent environment is the unique global environment $\Gamma{}\Pi$.
 
 ```{code-cell} ipython3
-def Λ(body, parameters, π=ΓΠ):
+def Λ(body: FunctionType, 
+      parameters: List[str] = [],  # default empty
+      π = ΓΠ) -> Procedure:        # default global
     result = Procedure(
         code={"body": body, "parameters": parameters}, 
         π=π)
@@ -256,7 +267,7 @@ work in progress
 
 ```{code-cell} ipython3
 from typing import Any, Dict, Tuple, List
-def EVAL(expr: Any, π: Environment=ΓΠ) -> Any:
+def EVAL(expr: Any, π: Environment = ΓΠ) -> Any:
     """Python does almost all this for us."""
     if isinstance(expr, int) or \
        isinstance(expr, float) or \
@@ -271,8 +282,10 @@ def EVAL(expr: Any, π: Environment=ΓΠ) -> Any:
     elif isinstance(expr, Tuple):
         # for memoized, curried functions
         result = expr
+    elif expr is None:
+        result = None
     else:
-        raise ValueError
+        raise ValueError(f'{expr} has unknown type {type(expr)}')
     return result
 ```
 
@@ -286,7 +299,9 @@ By default, procedures are applied in the unique global environment, $\Gamma\Pi$
 class IllegalArgumentsError(ValueError):
     pass
 
-def APPLY(proc: Procedure, args: List[Any], π:Environment=ΓΠ) -> Any:
+def APPLY(proc: Procedure, 
+          args: List[Any] = [], # default empty argument list
+          π: Environment = ΓΠ) -> Any:
     """How about a nice __getitem__ overload on 'Procedure' for this."""
     if len(proc.code['parameters']) != len(args):
         raise IllegalArgumentsError(
@@ -376,32 +391,86 @@ DEFINE('fact_iter',
 
 ## Procedures that Apply Procedures
 
++++
+
+Here is a procedure of `f` and `x` that applies `f` to `x`:
+
 ```{code-cell} ipython3
-Λ(lambda π: π.f(π.x),['f', 'x'])(ΓΠ.square, 42)
+# Outer parens necessary to break lines for comments (Python).
+(Λ(lambda π:      # Create environment E1 in ΓΠ
+  π.f(π.x),       # Apply E1.f to E1.x.
+  ['f', 'x'])     # parameters
+(ΓΠ.square, 42))  # <~~~ Bind f to square, x to 42.
 ```
 
-Anonymously; shadowing is no problem, here:
+### Anonymous Sibling
+
++++
+
+Here is a procedure that applies an internal procedure; shadowing is no problem, here:
 
 ```{code-cell} ipython3
-Λ(lambda π: Λ(lambda π: π.n * π.n, ['n'], π)(π.n), ['n'])(42)
+Λ(lambda π:     # Create environment E1 in ΓΠ.
+  Λ(lambda π:   # Create environment E2 in ΓΠ.
+    π.n * π.n,  # <~~~ n is bound in E2.
+    ['n']       #      (E2 is sibling to E1)
+   )            # Parent environment implicitly ΓΠ.
+  (π.n),        # <~~~ Look up in E1, bind in E2.
+  ['n'])(42)    # <~~~ Bind in E1.
 ```
 
-But you had better include the non-default $\pi$ on the inner if you don't want accidentally the correct answer.
+### Anonymous Child
+
++++
+
+Include the non-default $\pi$ on the inner to chain the environments:
 
 ```{code-cell} ipython3
-Λ(lambda π: Λ(lambda π: π.x * π.n, ['x'], π)(π.n), ['n'])(42)
+Λ(lambda π:     # Create environment E1 in ΓΠ.
+  Λ(lambda π:   # Create environment E2 in E1 !!!! 
+    π.x * π.n,  # <~~~ n in E1, x in E2.
+    ['x'],      #      (E2 is child of E1)
+    π)          # Parent environment *explicitly* E1.
+  (π.n),        # <~~~ Look up in E1, bind in E2
+  ['n'])(42)    # <~~~ Bind in E1
 ```
 
 ## Procedures that Return Procedures
 
++++
+
+The $\lambda$ below is just the identityf function: it returns its argument.
+
++++
+
+### Known to Parent
+
 ```{code-cell} ipython3
-Λ(lambda π: π.f, ['f'])(ΓΠ.square)(42)
+Λ(lambda π:  # Create environment E1 in ΓΠ.
+  π.f,       # Just return the value of parameter f.
+  ['f'])     # Parent environment implicitly ΓΠ.
+(ΓΠ.square)  # <~~~ Procedure bound in ΓΠ
+(42)         # Apply the returned procedure.
 ```
 
-Anonymously:
+### Anonymous
+
++++
+
+Return a fresh anonymous procedure rather than one bound to a global symbol as above:
 
 ```{code-cell} ipython3
-Λ(lambda π: π.f, ['f'])(Λ(lambda π: π.x * π.x, ['x']))(42)
+Λ(lambda π:                      # Identity function as above.
+  π.f, 
+  ['f'])
+(Λ(lambda π: π.x * π.x, ['x']))  # <~~~ Anonymous procedure
+(42)                             # Apply the returned procedure.
+```
+
+## Procedures of No Arguments (Thunks)
+
+```{code-cell} ipython3
+Λ(lambda π: 42)()
 ```
 
 ## $\Upsilon$: Squaring Square Roots of Functions
@@ -519,7 +588,7 @@ DEFINE('Υ3',
          ['d']));
 ```
 
-Here is user-level domain code, redefining `fact_iter` in domain-code form. Any domain code is a function of `f`, recursive _business code_. In this case, `f` is a function of 3 business parameters. This will get us to a tail-recursive solution in the [section on tail recursion](#tail-recursion). 
+Here is user-level domain code, redefining `fact_iter` in domain-code form. Any domain code is a function of `f`, recursive _business code_. In this case, `f` is a function of 3 business parameters. This will get us to a tail-recursive solution in the [section on tail recursion](#tail-recursion).
 
 ```{code-cell} ipython3
 # λ f: λ m, c, x: m if c > x else f(m*c, c+1, x)
@@ -614,7 +683,7 @@ DEFINE('fib_slow',
 ΓΠ.Υ1(ΓΠ.fib_slow)(6)
 ```
 
-This is miserable even for $n=23$. You won't want to call it for bigger arguments. 
+This is miserable even for $n=23$. You won't want to call it for bigger arguments.
 
 ```{code-cell} ipython3
 ΓΠ.Υ1(ΓΠ.fib_slow)(23)
@@ -890,6 +959,133 @@ try:
 except RecursionError as e:
     print(e.args)
 ```
+
+# DO
+
++++
+
+```
+(DO ((<var1> <init1> <step1>)
+     (<var2> <init2> <step2>)
+     ...
+     (<varN> <initN> <stepN>))
+    (<pred> <value>) 
+    <optional body>)
+```
+
++++
+
+# LABELS
+
++++
+
+# SET_BANG
+
++++
+
+Tested below in [block](#block). Like Gambit and unlike Common Lisp and Emacs Lisp, we can only `set!` symbols that are already `define`d.
+
+```{code-cell} ipython3
+def SET_BANG(sym: str, val: Any, π: Environment) -> None:
+    ee = EVAL(val, π)
+    """recursive lookup"""
+    while π is not None:
+        try:
+            getattr(π.ϕ, sym)
+            break
+        except AttributeError as _:
+            if π.π is None:
+                raise NameError(f'Name {sym} is unbound.')
+            else:  # recurse
+                π = π.π
+    setattr(π.ϕ, sym, ee)
+    return None  # following Gambit Scheme
+```
+
+# BLOCK / BEGIN<a id="block"></a>
+
++++
+
+Sequencing of statements and expressions is not fundamental. Instead, we must chain $\lambda$s. The paper calls the form `BLOCK`. Scheme calls it `BEGIN`. Common Lisp calls it `PROGN`. 
+
++++
+
+## Convention: Statements are 1-Thunks
+
++++
+
+In the logician's $\lambda$-calculus, all $\lambda$-forms take one parameter. In Schemulator, procedures of one parameter are ***1-Thunks***, just as procedures of no parameters are ***thunks***.
+
++++
+
+Use `_` as a dummy parameter, as does Python.
+
++++
+
+First, following the paper, we define a block of two statements.
+
+```{code-cell} ipython3
+def BLOCK2(s1: Procedure, s2: Procedure) -> Any:
+    """Sequentially execute two statement-expressions."""
+    s2(s1(None))
+    
+    
+BEGIN2 = BLOCK2
+
+
+# Λ(lambda π: ASSIGN('x', 6, π), ['ανδϵικϵλο'])(_)
+DEFINE('x', 0)
+BLOCK2(
+    Λ(lambda π: SET_BANG('x', 6, π), ['_']), 
+    Λ(lambda π: print(π.x * 7), ['_']))             
+
+try:
+    BLOCK2(
+        Λ(lambda π: SET_BANG('y', 6, π), ['_']), 
+        Λ(lambda π: print(π.z * 7), ['_']))             
+except NameError as e:
+    print(e.args)
+```
+
+```{code-cell} ipython3
+def BLOCK(*ss: List[Procedure]) -> Any:
+    intermediate = None
+    for s in ss:
+        if intermediate is not None:
+            intermediate = s(intermediate(None))
+        intermediate = s(None)
+
+DEFINE('x', 0)
+DEFINE('y', 42)
+BLOCK(
+    Λ(lambda π: SET_BANG('x', 6, π), ['_']), 
+    Λ(lambda π: SET_BANG('x', π.x * 7, π), ['_']),
+    Λ(lambda π: print(π.x * π.y), ['_']))
+```
+
+# LET*, LET, LETREC
+
++++
+
+`LET_STAR` is sequential binding of locals. `LET` is parallel binding. `LETREC` is mutually recursive `LET`.
+
+```{code-cell} ipython3
+def LET_STAR(
+        binding_pairs: List[Tuple[str, Any]], 
+        body: Any, 
+        π: Environment = ΓΠ) -> Any:
+    if len(binding_pairs) == 1:
+        ρ = APPLY(body, [], π=π)
+        return ρ
+    
+LET_STAR([('x', 42)], 
+         Λ(lambda π: 
+           ΓΠ.square(π.x)))
+```
+
+# COND
+
++++
 
 # Junkyard
 
