@@ -19,6 +19,7 @@ kernelspec:
 #### Version 2
 #### Brian Beckman
 #### 12 Nov 2022
+#### License: [Creative Commons Attribution 4.0 International Public License](https://creativecommons.org/licenses/by/4.0/legalcode)
 
 +++
 
@@ -190,7 +191,7 @@ class Environment:
 # The ugliness of 'setattr' is hidden in DEFINE.    
 ```
 
-# Unique Global Environment $\Gamma\Pi$
+# Unique Global Environment $\Gamma\Pi$<a id="global-environment"></a>
 
 ```{code-cell} ipython3
 ΓΠ = Environment(lambda: None, None)  # Γ for "global," Π for "environment"
@@ -265,19 +266,39 @@ setattr(
 ΓΠ.square(5, 6)
 ```
 
+# Var<a id="var"></a>
+
++++
+
+Sometimes, we want to interpret strings not as self-evaluating atoms but as references to variables in an environment. We test the type [after defining `EVAL`, below](#eval).
+
+```{code-cell} ipython3
+@dataclass
+class Var():
+    sym: str
+```
+
 # Application
 
 +++
 
-In $\lambda$-calculus, an _Application_ is an unevaluated list with a Procedure or symbol (`str`) in the first slot and unevaluated actual arguments in the remaining positions. 
+In $\lambda$-calculus, an _Application_ is an unevaluated list with a Procedure or symbol (`str`) in the first slot and unevaluated actual arguments in the remaining positions.
 
 ```{code-cell} ipython3
 from typing import Union, Any
+class Application:
+    """forward reference; corrected immediately below"""
+    pass
+def EVAL_APPLICATION(expr: Application, π: Environment = ΓΠ):
+    """forward reference; corrected below"""
+    pass
 @dataclass
 class Application():
     head: Union[str, Procedure]
     args: List[Any]
     π: Environment = ΓΠ
+    def __call__(self):
+        EVAL_APPLICATION(self, π)
 ```
 
 # QUOTE, QUASIQUOTE, UNQUOTE
@@ -288,7 +309,7 @@ TODO
 
 +++
 
-## EVAL(expr, $\pi$)
+## EVAL(expr, $\pi$)<a id="eval"></a>
 
 +++
 
@@ -329,11 +350,13 @@ def EVAL(expr: Any, π: Environment = ΓΠ) -> Any:
     elif isinstance(expr, Procedure):
         ρ = expr
     elif isinstance(expr, Dict):
-        # for memo tables:
+        # self-evaluating, for memo tables:
         ρ = expr
     elif isinstance(expr, Tuple):
-        # for memoized, curried functions
+        # self-evaluating, for memoized, curried functions
         ρ = expr
+    elif isinstance(expr, Var):
+        ρ = π[expr.sym]  # recursive lookup in Environment
     elif expr is None:
         ρ = None
     elif isinstance(expr, Application):
@@ -341,6 +364,16 @@ def EVAL(expr: Any, π: Environment = ΓΠ) -> Any:
     else:
         raise ValueError(f'{expr} has unsupported type {type(expr)}')
     return ρ
+```
+
+### Test Var Lookup
+
++++
+
+We defined this little [Greek](#greek) system-test variable in [section "Global Environment"](#global-environment).
+
+```{code-cell} ipython3
+EVAL(Var('γόὂ'))
 ```
 
 ## APPLY(proc, args, $\pi$)<a id="apply"></a>
@@ -382,6 +415,12 @@ Works on anonymous procedures, too:
 Λ(lambda π: π.x * π.x, ['x'])(5)
 ```
 
+Test multiple parameters and arguments:
+
+```{code-cell} ipython3
+Λ(lambda π: π.x * π.y, ['x', 'y'])(6, 7)
+```
+
 ### Test Application
 
 ```{code-cell} ipython3
@@ -390,6 +429,10 @@ EVAL(Application(ΓΠ.square, [5]))
 
 ```{code-cell} ipython3
 EVAL(Application('square', [42]))
+```
+
+```{code-cell} ipython3
+EVAL(Application('square', [Var('γόὂ')]))
 ```
 
 ## DEFINE(sym, val, $\pi$)
@@ -1075,8 +1118,9 @@ def SET_BANG(
     ee = EVAL(val, π)
     """recursive lookup"""
     while π is not None:
+        # Find the right π; ...
         try:
-            getattr(π.ϕ, sym)
+            getattr(π.ϕ, sym)  # ... don't recurse via π[sym]
             break
         except AttributeError as _:
             if π.π is None:
@@ -1091,7 +1135,7 @@ def SET_BANG(
 
 +++
 
-Sequencing of statements and expressions is not fundamental. Instead, we must chain $\lambda$s. The paper calls the form `BLOCK`. Scheme calls it `BEGIN`. Common Lisp calls it `PROGN`. 
+Sequencing of statements and expressions is not fundamental. Instead, we must chain $\lambda$s. The paper calls the form `BLOCK`. Scheme calls it `BEGIN`. Common Lisp calls it `PROGN`.
 
 +++
 
@@ -1182,34 +1226,24 @@ BEGIN = BLOCK
 
 `LET_STAR` is sequential binding of locals. `LET` is parallel binding. `LETREC` is mutually recursive `LET`.
 
-+++
-
-To start, let's say that `body` must be a thunk. 
-
-+++
-
-TODO: This choice may lead to redesign of `EVAL`.
-
 ```{code-cell} ipython3
 def LET_STAR(
         binding_pairs: List[Tuple[str, Any]], 
         body: Any, 
         π: Environment = ΓΠ) -> Any:
     if len(binding_pairs) == 1:
-        k, v = binding_pairs[0]
-        ρ = APPLY(
-            Λ(lambda π: body,
-              [k],
-              π=π),
-            [v], 
-            π=π)
+        key, val = binding_pairs[0]
+        νλ = Λ(lambda π:
+              EVAL(body, π),
+              [key],
+              π=π)
+        ρ = νλ(val)
         return ρ
     else:
-        pass
-    
+        raise NotImplementedError
+        
 LET_STAR([('z', 42)], 
-           Λ(lambda π:
-             ΓΠ.square(π.z)))()
+         Application(ΓΠ.square, [Var('z')]))
 ```
 
 # COND
