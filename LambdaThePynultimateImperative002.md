@@ -199,7 +199,7 @@ setattr(ΓΠ.ϕ, 'γόὂ', 43)
 ΓΠ.γόὂ
 ```
 
-# Procedure
+# Procedure(code{body, params}, $\pi$)<a id="procedure"></a>
 
 +++
 
@@ -266,7 +266,7 @@ setattr(
 ΓΠ.square(5, 6)
 ```
 
-# Var<a id="var"></a>
+# Var(sym)<a id="var"></a>
 
 +++
 
@@ -278,7 +278,7 @@ class Var():
     sym: str
 ```
 
-# Application
+# Application(head, args, $\pi$)<a id="application"></a>
 
 +++
 
@@ -300,6 +300,20 @@ class Application():
     def __call__(self):
         EVAL_APPLICATION(self, π)
 ```
+
+### $\Xi$(head, args, $\pi$)
+
++++
+
+Just as [Procedure](#procedure) has a [system-reserved Greek](#greek) shortcut, $\Lambda$, we make a shortcut, $\Xi$, for `Application`.
+
+```{code-cell} ipython3
+Ξ = Application
+```
+
+We test this a bit later.
+
++++
 
 # QUOTE, QUASIQUOTE, UNQUOTE
 
@@ -427,12 +441,14 @@ Test multiple parameters and arguments:
 EVAL(Application(ΓΠ.square, [5]))
 ```
 
+Test its Greek shortcut:
+
 ```{code-cell} ipython3
-EVAL(Application('square', [42]))
+EVAL(Ξ('square', [42]))
 ```
 
 ```{code-cell} ipython3
-EVAL(Application('square', [Var('γόὂ')]))
+EVAL(Ξ('square', [Var('γόὂ')]))
 ```
 
 ## DEFINE(sym, val, $\pi$)
@@ -1226,6 +1242,10 @@ BEGIN = BLOCK
 
 `LET_STAR` is sequential binding of locals. `LET` is parallel binding. `LETREC` is mutually recursive `LET`.
 
++++
+
+Remember that $\Xi$ is a [Greek](#greek) shortcut for [`Application`](#application). Body of any of the _Lets_ must be an `Application` so that the environment $\pi$ can be propagated.
+
 ```{code-cell} ipython3
 def LET_STAR(
         binding_pairs: List[Tuple[str, Any]], 
@@ -1242,8 +1262,7 @@ def LET_STAR(
     else:
         raise NotImplementedError
         
-LET_STAR([('z', 42)], 
-         Application(ΓΠ.square, [Var('z')]))
+LET_STAR([('z', 42)], Ξ(ΓΠ.square, [Var('z')]))
 ```
 
 # COND
