@@ -824,8 +824,10 @@ This is miserable even for $n=23$. You won't want to call it for bigger argument
 ΓΠ.Υ1(ΓΠ.fib_slow)(23)
 ```
 
+The following takes 10 seconds. Uncomment if you want proof.
+
 ```{code-cell} ipython3
-timeit(ΓΠ.Υ1(ΓΠ.fib_slow)(23))
+# timeit(ΓΠ.Υ1(ΓΠ.fib_slow)(23))
 ```
 
 Without linearization, Fibonacci 500 would not complete in $10^{30}$ times the Age of the Universe. One way to linearize is tail recursion. Another way is [memoization](#memoization) (_sic:_ not _memorization_). 
@@ -851,8 +853,12 @@ LOOP3(ΓΠ.fib_iter)(0, 1, 23)
 
 Time it:
 
++++
+
+The following takes 10 seconds. Uncomment if you want proof.
+
 ```{code-cell} ipython3
-timeit(LOOP3(ΓΠ.fib_iter)(0, 1, 23))
+# timeit(LOOP3(ΓΠ.fib_iter)(0, 1, 23))
 ```
 
 4000 times faster. Stress it, remembering that the non-tail-recursive version would not complete in astronimical time:
@@ -925,8 +931,12 @@ DEFINE('fib_fast',
 
 1,000 times faster than the original, but stil not tail-recursive:
 
++++
+
+The following takes 10 seconds. Uncomment if you want proof.
+
 ```{code-cell} ipython3
-timeit(ΓΠ.Υ2C(ΓΠ.fib_fast)({})(23)[1])
+# timeit(ΓΠ.Υ2C(ΓΠ.fib_fast)({})(23)[1])
 ```
 
 Still blows the recursion limit:
@@ -1153,7 +1163,11 @@ def SET_BANG(
 
 +++
 
-Sequencing of statements and expressions is not fundamental. Instead, we must chain $\lambda$s. The paper calls the form `BLOCK`. Scheme calls it `BEGIN`. Common Lisp calls it `PROGN`.
+Sequencing of statements and expressions is not fundamental. Instead, we must chain $\lambda$s. All but the last $\lambda$ are for side-effec and must return `None`. 
+
++++
+
+The paper calls the form `BLOCK`. Scheme calls it `BEGIN`. Common Lisp calls it `PROGN`.
 
 +++
 
@@ -1162,35 +1176,70 @@ Use `_` as a dummy parameter, as does Python.
 ```{code-cell} ipython3
 def BLOCK(*ss: List[Procedure], 
          π: Environment = ΓΠ) -> Any:
-    intermediate = None
+    ρ = None
     for s in ss:
-        if intermediate is not None:
-            intermediate = APPLY(
-                s, 
-                [APPLY(
-                    intermediate,
-                    [None],
-                    π=π)],
-                π=π)
-        intermediate = APPLY(s, [None], π)
+        if ρ is not None:
+            ρ = APPLY(s, 
+                      [APPLY( ρ, [None], π=π)],
+                      π=π)
+        else:
+            ρ = APPLY(s, [None], π)
+    return ρ
+```
 
+```{code-cell} ipython3
 DEFINE('x', 0)
 BLOCK(
     Λ(lambda π: SET_BANG('x', 6, π), ['_']), 
-    Λ(lambda π: print(π.x * 7), ['_']))
+    Λ(lambda π: π.x * 7, ['_']))
+```
 
+```{code-cell} ipython3
 DEFINE('y', 42)
 BLOCK(
     Λ(lambda π: SET_BANG('x', 6, π), ['_']), 
     Λ(lambda π: SET_BANG('x', π.x * 7, π), ['_']),
-    Λ(lambda π: print(π.x * π.y), ['_']))
+    Λ(lambda π: π.x * π.y, ['_']))
+```
 
+```{code-cell} ipython3
 try:
     BLOCK(
         Λ(lambda π: SET_BANG('x', 6, π), ['_']), 
         Λ(lambda π: SET_BANG('x', π.x * 7, π), ['_']),
         Λ(lambda π: print(π.x * π.y), ['_']),
         Λ(lambda π: π.z, ['_']))
+except NameError as e:
+    print(e.args)
+```
+
+Test BLOCK in a non-global environment $\pi$:
+
+```{code-cell} ipython3
+try:
+    Λ(lambda π: 
+      print(
+      BLOCK(
+          Λ(lambda π: SET_BANG('x1', 7, π), ['_'], π),
+          Λ(lambda π: SET_BANG('y1', 6, π), ['_'], π),
+          Λ(lambda π: π.x1 * π.y1, ['_'], π),
+          π=π
+      )),
+      ['x1', 'y1'])(0, 0)
+except NameError as e:
+    print(e.args)
+```
+
+Names `x1` and `y1` are not in the global environment.
+
+```{code-cell} ipython3
+try:
+    ΓΠ.x1
+except NameError as e:
+    print(e.args)
+    
+try:
+    ΓΠ.y1
 except NameError as e:
     print(e.args)
 ```
@@ -1308,7 +1357,8 @@ def LET(
 Test depth 0:
 
 ```{code-cell} ipython3
-LET([], Ξ(Λ(lambda π: print(43 * 42))))
+LET([], 
+    Ξ(Λ(lambda π: print(43 * 42))))
 ```
 
 Test depth 1:
@@ -1318,27 +1368,74 @@ LET([('z', 42)],
     Ξ(ΓΠ.square, [Var('z')]))
 ```
 
-Test depth 2:
+Test depth 2:Γ
 
 ```{code-cell} ipython3
 LET([('z', 42), ('y', 43)], 
-         Ξ(Λ(lambda π: print(π.z * π.y))))
+    Ξ(Λ(lambda π: print(π.z * π.y))))
 ```
 
 Reversed:
 
 ```{code-cell} ipython3
 LET([('y', 42), ('z', 43)], 
-         Ξ(Λ(lambda π: print(π.z * π.y))))
+    Ξ(Λ(lambda π: print(π.z * π.y))))
 ```
 
-With applications as values, also demonstrating that the inner `y` is evaluated, not any lurking in the global environment $\Gamma\Pi$:
+With applications as values, also demonstrating that the inner `y` is evaluated, not lurking in the global environment $\Gamma\Pi$, where `y` is 0:
 
 ```{code-cell} ipython3
 DEFINE('y', 0)
 LET([('y', 42), 
      ('z', Ξ(Λ(lambda π: 42 + 1)))], 
-         Ξ(Λ(lambda π: print(π.z * π.y))))
+    Ξ(Λ(lambda π: print(π.z * π.y))))
+```
+
+Order does not matter:
+
+```{code-cell} ipython3
+LET([('z', Ξ(Λ(lambda π: 42 + 1))),
+     ('y', 42)], 
+    Ξ(Λ(lambda π: print(π.z * π.y))))
+```
+
+Prove global `y` is unchanged and that `z` is bound only in local environment, not global.
+
+```{code-cell} ipython3
+print(ΓΠ.x)
+print(ΓΠ.y)
+try:
+    print(ΓΠ.z)
+except NameError as e:
+    print(e.args)
+```
+
+## LETREC
+
+```{code-cell} ipython3
+def LETREC(
+        binding_pairs: List[Tuple[str, Any]], 
+        body: Any, 
+        π: Environment = ΓΠ) -> Any:
+    if len(binding_pairs) == 0:
+        ρ = EVAL(body, π)
+        return ρ
+    keys = [pair[0] for pair in binding_pairs]
+    vals = [pair[1] for pair in binding_pairs]
+    νλ = Λ(lambda π:
+           EVAL(body, π),
+           keys, π=π)
+    ρ = APPLY(νλ, vals, π=π)
+    return ρ        
+```
+
+```{code-cell} ipython3
+try:
+    LETREC([('z0', Ξ(Λ(lambda π: 1 + (π.y0)()))),
+            ('y0', Ξ(Λ(lambda π: 42)))],
+        Ξ(Λ(lambda π: π.z0 * π.y0)))
+except NameError as e:
+    print(e.args)
 ```
 
 # COND
