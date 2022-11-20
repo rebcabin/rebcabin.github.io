@@ -292,16 +292,17 @@ class Application:
 def EVAL_APPLICATION(expr: Application, π: Environment = ΓΠ):
     """forward reference; corrected below"""
     pass
+from dataclasses import field
 @dataclass
 class Application():
     head: Union[str, Procedure]
-    args: List[Any]
+    args: List[Any] = field(default_factory=list)
     π: Environment = ΓΠ
     def __call__(self):
         EVAL_APPLICATION(self, π)
 ```
 
-### $\Xi$(head, args, $\pi$)
+## $\Xi$(head, args, $\pi$)
 
 +++
 
@@ -1170,52 +1171,26 @@ def THUNK1(body: Any,
 
 Use `_` as a dummy parameter, as does Python.
 
-+++
-
-First, following the paper, we define a block of two statements.
-
-```{code-cell} ipython3
-def BLOCK2(s1: Procedure, 
-           s2: Procedure,
-           π: Environment = ΓΠ) -> Any:
-    """Sequentially execute two statement-expressions."""
-    APPLY(
-        s2,                      #      By applicative order:
-        [APPLY(s1, [None], π)],  # <~~~ inner is eval'ed first.
-        π)
-    
-DEFINE('x', 0)    
-BLOCK2(
-    Λ(lambda π: SET_BANG('x', 6, π), ['_']), 
-    Λ(lambda π: print(π.x * 7), ['_']))
-
-try:
-    BLOCK2(
-        Λ(lambda π: SET_BANG('y', 6, π), ['_']), 
-        Λ(lambda π: print(π.z * 7), ['_']))             
-except NameError as e:
-    print(e.args)
-```
-
 ```{code-cell} ipython3
 def BLOCK(*ss: List[Procedure], 
          π: Environment = ΓΠ) -> Any:
     intermediate = None
     for s in ss:
         if intermediate is not None:
-            intermediate = APPLY(s, 
-                                 [APPLY(
-                                     intermediate,
-                                     [None],
-                                     π=π)],
-                                 π=π)
+            intermediate = APPLY(
+                s, 
+                [APPLY(
+                    intermediate,
+                    [None],
+                    π=π)],
+                π=π)
         intermediate = APPLY(s, [None], π)
 
+DEFINE('x', 0)
 BLOCK(
     Λ(lambda π: SET_BANG('x', 6, π), ['_']), 
     Λ(lambda π: print(π.x * 7), ['_']))
 
-DEFINE('x', 0)
 DEFINE('y', 42)
 BLOCK(
     Λ(lambda π: SET_BANG('x', 6, π), ['_']), 
@@ -1246,23 +1221,61 @@ BEGIN = BLOCK
 
 Remember that $\Xi$ is a [Greek](#greek) shortcut for [`Application`](#application). Body of any of the _Lets_ must be an `Application` so that the environment $\pi$ can be propagated.
 
++++
+
+> ***Results are undefined if the body is not an [`Application`](#application) or $\Xi$.***
+
 ```{code-cell} ipython3
 def LET_STAR(
         binding_pairs: List[Tuple[str, Any]], 
         body: Any, 
         π: Environment = ΓΠ) -> Any:
+    if len(binding_pairs) == 0:
+        ρ = EVAL(body, π)
+        return ρ
+    key, val = binding_pairs[0]
     if len(binding_pairs) == 1:
-        key, val = binding_pairs[0]
         νλ = Λ(lambda π:
               EVAL(body, π),
-              [key],
-              π=π)
-        ρ = νλ(val)
-        return ρ
+              [key], π=π)
     else:
-        raise NotImplementedError
-        
-LET_STAR([('z', 42)], Ξ(ΓΠ.square, [Var('z')]))
+        νλ = Λ(lambda π:
+              LET_STAR(binding_pairs[1:], body, π),
+              [key], π=π)
+    ρ = νλ(EVAL(val, π))
+    return ρ        
+```
+
+Test depth 0:
+
+```{code-cell} ipython3
+print(LET_STAR([], 
+               Ξ(Λ(lambda π: print(43 * 42)))))
+```
+
+Test depth 1:
+
+```{code-cell} ipython3
+print(LET_STAR([('z', 42)], 
+               Ξ(ΓΠ.square, [Var('z')])))
+```
+
+Test depth 2:
+
+```{code-cell} ipython3
+print(LET_STAR([('z', 42), ('y', 43)], 
+               Ξ(Λ(lambda π: print(π.z * π.y)))))
+```
+
+Test depth 3, plus dependence on earlier definitions:
+
+```{code-cell} ipython3
+print(LET_STAR([('z', 42), ('y', 43), 
+                ('w', 
+                 Ξ(Λ(lambda π: π.z * π.y, ['z', 'y']), 
+                   [Var('z'), Var('y')]))
+               ], 
+               body=Ξ(Λ(lambda π: print(π.w)))))
 ```
 
 # COND
