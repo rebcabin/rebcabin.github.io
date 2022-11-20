@@ -270,7 +270,7 @@ setattr(
 
 +++
 
-Sometimes, we want to interpret strings not as self-evaluating atoms but as references to variables in an environment. We test the type [after defining `EVAL`, below](#eval).
+Sometimes, we want to interpret strings not as self-evaluating atoms but as references to variables in an environment. We test the type [after defining `EVAL`, below](#eval). `Var` is needed to delay evaluation in [LET_STAR](#let-star).
 
 ```{code-cell} ipython3
 @dataclass
@@ -282,7 +282,11 @@ class Var():
 
 +++
 
-In $\lambda$-calculus, an _Application_ is an unevaluated list with a Procedure or symbol (`str`) in the first slot and unevaluated actual arguments in the remaining positions.
+In $\lambda$-calculus, an _Application_ is an unevaluated list with a Procedure or symbol (`str`) in the first slot and unevaluated actual arguments in the remaining positions. This is needed in [LET_STAR](#let-star) to delay evaluation until the environment is established, where [EVAL](#eval) evaluates them in the proper environment $\pi$.
+
++++
+
+`Application` is a placeholder for a more general [QUOTE](#quote) mechanism.
 
 ```{code-cell} ipython3
 from typing import Union, Any
@@ -316,7 +320,7 @@ We test this a bit later.
 
 +++
 
-# QUOTE, QUASIQUOTE, UNQUOTE
+# QUOTE, QUASIQUOTE, UNQUOTE<a id="quote"></a>
 
 +++
 
@@ -385,7 +389,7 @@ def EVAL(expr: Any, π: Environment = ΓΠ) -> Any:
 
 +++
 
-We defined this little [Greek](#greek) system-test variable in [section "Global Environment"](#global-environment).
+We defined the little [Greek](#greek) system-test variable `γόὂ` in [section "Global Environment"](#global-environment).
 
 ```{code-cell} ipython3
 EVAL(Var('γόὂ'))
@@ -442,7 +446,7 @@ Test multiple parameters and arguments:
 EVAL(Application(ΓΠ.square, [5]))
 ```
 
-Test its Greek shortcut:
+Test the [Greek](#greek) shortcut for `Application`:
 
 ```{code-cell} ipython3
 EVAL(Ξ('square', [42]))
@@ -499,7 +503,7 @@ DEFINE('factorial',
 ΓΠ.factorial(6)
 ```
 
-This doesn't tail-recurse because Python does not tail-recurse. See [Tail Recursion](#tail-recursion) for mitigation work-in-progress.
+This doesn't tail-recurse because Python does not tail-recurse. See [Tail Recursion](#tail-recursion) for mitigation.
 
 ```{code-cell} ipython3
 DEFINE('fact_iter',
@@ -563,7 +567,7 @@ Include the non-default $\pi$ on the inner to chain the environments:
 
 +++
 
-The $\lambda$ below is just the identityf function: it returns its argument.
+The $\Lambda$ procedure below is just the identityf function: it returns its argument.
 
 +++
 
@@ -591,30 +595,6 @@ Return a fresh anonymous procedure rather than one bound to a global symbol as a
 (42)                             # Apply the returned procedure.
 ```
 
-## THUNK: Procedure of No Arguments
-
-```{code-cell} ipython3
-Λ(lambda π: 42)()
-```
-
-```{code-cell} ipython3
-def THUNK(body: Any,
-          π: Environment = ΓΠ) -> Procedure:
-    ρ = Λ(lambda π: 
-          EVAL(body, π=π), 
-          [], 
-          π=π)
-    return ρ
-```
-
-```{code-cell} ipython3
-THUNK(42)()
-```
-
-```{code-cell} ipython3
-APPLY(THUNK(42), [])
-```
-
 ## $\Upsilon$: Squaring Square Roots of Functions
 
 +++
@@ -631,9 +611,13 @@ Don't forget non-default $\pi$ on the inner lest `sf` be undefined.
 
 ```{code-cell} ipython3
 Λ(lambda π: 
-  Λ(lambda π: 1 if π.n < 1 else π.n * π.sf(π.sf)(π.n - 1), ['n'], π), ['sf'])(
+  Λ(lambda π: 
+    1 if π.n < 1 else π.n * π.sf(π.sf)(π.n - 1), 
+    ['n'], π), ['sf'])(
     Λ(lambda π: 
-      Λ(lambda π: 1 if π.n < 1 else π.n * π.sf(π.sf)(π.n - 1), ['n'], π), ['sf']))(6)
+      Λ(lambda π: 
+        1 if π.n < 1 else π.n * π.sf(π.sf)(π.n - 1), 
+        ['n'], π), ['sf']))(6)
 ```
 
 Abstract `sf(sf)(m)` into a delayed $\lambda$ of `m`:
@@ -641,12 +625,16 @@ Abstract `sf(sf)(m)` into a delayed $\lambda$ of `m`:
 ```{code-cell} ipython3
 Λ(lambda π: 
   Λ(lambda π: 
-    Λ(lambda π: 1 if π.n < 1 else π.n * π.f(π.n - 1), ['n'], π), 
+    Λ(lambda π: 
+      1 if π.n < 1 else π.n * π.f(π.n - 1), 
+      ['n'], π), 
     ['f'], π)(Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)), 
   ['sf'])(
 Λ(lambda π: 
   Λ(lambda π: 
-    Λ(lambda π: 1 if π.n < 1 else π.n * π.f(π.n - 1), ['n'], π), 
+    Λ(lambda π: 
+      1 if π.n < 1 else π.n * π.f(π.n - 1), 
+      ['n'], π), 
     ['f'], π)(Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)), 
   ['sf']))(6)
 ```
@@ -661,7 +649,9 @@ Abstract the _domain code_ into `d`, a function of `f`, the _business code_, is 
         ['sf'], π)), 
   ['d'])(
     Λ(lambda π: # of f
-      Λ(lambda π: 1 if π.n < 1 else π.n * π.f(π.n - 1), ['n'], π), 
+      Λ(lambda π: 
+        1 if π.n < 1 else π.n * π.f(π.n - 1), 
+        ['n'], π), 
       ['f'])
     )(6)
 ```
@@ -675,7 +665,8 @@ Abstract the self-applied $\lambda$ of `sf` into `g`:
         ['sf'], π)), 
   ['d'])(
     Λ(lambda π: # domain code; function of business code, f
-      Λ(lambda π: 1 if π.n < 1 else π.n * π.f(π.n - 1), 
+      Λ(lambda π: 
+        1 if π.n < 1 else π.n * π.f(π.n - 1), # business code
         ['n'], π), # business parameter, n
       ['f']) # recursive function
 )(6)
@@ -704,7 +695,8 @@ DEFINE('Υ1',
 
 DEFINE('fact_recursive',
       Λ(lambda π: # domain code; function of business code, f
-        Λ(lambda π: 1 if π.n < 1 else π.n * π.f(π.n - 1), 
+        Λ(lambda π: 
+          1 if π.n < 1 else π.n * π.f(π.n - 1), # business code
           ['n'], π), # business parameter, n
         ['f'])) # recursive function
 
@@ -722,10 +714,11 @@ $\Upsilon$ must be tailored for a given number of business parameters. This one 
 DEFINE('Υ3', 
        Λ(lambda π: # of d, the domain code ...
          Λ(lambda π: π.g(π.g), ['g'], π)(
-             # of business code of three parameters
-             Λ(lambda π: π.d(
-                 Λ(lambda π: π.sf(π.sf)(π.m, π.c, π.x), 
-                   ['m', 'c', 'x'], π)), 
+             # ... of business code of three parameters
+             Λ(lambda π: π.d(  # domain code
+                 Λ(lambda π: 
+                   π.sf(π.sf)(π.m, π.c, π.x),  # business code
+                   ['m', 'c', 'x'], π)),  # business parameters
                ['sf'], π)), 
          ['d']));
 ```
@@ -750,11 +743,11 @@ DEFINE('fact_iter', # domain code is a function of f ...
 
 +++
 
-Thanks to [Thomas Baruchel for this idea on tail recursion](https://stackoverflow.com/questions/13591970/does-python-optimize-tail-recursion). If users are aware that their domain code is tail-recursive, then they may call it via `LOOP` instead of via $\Upsilon$. In Scheme, detection of tail recursion is automatic. In Python and Schemulator, users must manage tail recursion explicitly. This isn't a terrible issue. Tail-calls are lexically obvious, so users should always know. In Clojure, there is precedent. Users must explicitly write `loop` and `recur`. In any event, domain code can always be called via the proper $\Upsilon$, the one that knows the count of business parameters.
+Thanks to [Thomas Baruchel for this idea on tail recursion](https://stackoverflow.com/questions/13591970/does-python-optimize-tail-recursion). If users are aware that their domain code is tail-recursive, then they may call it via `LOOP` instead of via $\Upsilon$. In Scheme, detection of tail recursion is automatic. In Python and Schemulator, users must invoke tail recursion explicitly. This isn't terrible. Tail-calls are lexically obvious, so users should always know. In Clojure, there is precedent. Users must explicitly write `loop` and `recur`. In any event, domain code can always be called via the proper, non-tail-recursive $\Upsilon$, the one that knows the count of business parameters.
 
 +++
 
-We imitate Clojure's names `loop` and `recur`. The glyph that looks like "P" below is Greek Capital Rho for "recur." `LOOP3` has the same signature as $\Upsilon3$; it takes domain code as its sole argument. Names in user code should not collide with P B if users remember that they should [avoid Greek in user code](#greek). As with $\Upsilon$, Rho and `LOOP` must know their argument counts. That's OK for now (TODO: reconsider).
+We imitate Clojure's names `loop` and `recur`. The glyph that looks like "P" below is Greek Capital Rho for "recur." `LOOP3` has the same signature as $\Upsilon3$; it takes domain code as its sole argument. Names in user code should not collide with P if users remember that they should [avoid Greek in user code](#greek). As with $\Upsilon$, Rho and `LOOP` must know their argument counts. That's OK for now (TODO: reconsider).
 
 ```{code-cell} ipython3
 class TailCall(Exception):  
@@ -787,7 +780,7 @@ LOOP3(ΓΠ.fact_iter)(1, 1, 20)
 
 +++
 
-## Prove It
+## Prove It on `fact_iter`
 
 +++
 
@@ -835,7 +828,11 @@ This is miserable even for $n=23$. You won't want to call it for bigger argument
 timeit(ΓΠ.Υ1(ΓΠ.fib_slow)(23))
 ```
 
-Without linearization, Fibonacci 500 would not complete in $10^{30}$ times the Age of the Universe. One way to linearize is tail recursion. Another way is [memoization](#memoization) (not _memorization_). Tail-recursive memoization is possible but not necessary. A tail-recursive Fibonacci easy and blazingly fast:
+Without linearization, Fibonacci 500 would not complete in $10^{30}$ times the Age of the Universe. One way to linearize is tail recursion. Another way is [memoization](#memoization) (_sic:_ not _memorization_). 
+
++++
+
+Tail-recursive memoization is possible but not necessary. A tail-recursive Fibonacci easy and blazingly fast:
 
 ```{code-cell} ipython3
 DEFINE('fib_iter',
@@ -858,7 +855,7 @@ Time it:
 timeit(LOOP3(ΓΠ.fib_iter)(0, 1, 23))
 ```
 
-4000 times faster. Stress it:
+4000 times faster. Stress it, remembering that the non-tail-recursive version would not complete in astronimical time:
 
 ```{code-cell} ipython3
 LOOP3(ΓΠ.fib_iter)(0, 1, 5000)
@@ -926,13 +923,13 @@ DEFINE('fib_fast',
 ΓΠ.Υ2C(ΓΠ.fib_fast)({})(23)[1]
 ```
 
-1,000 times faster
+1,000 times faster than the original, but stil not tail-recursive:
 
 ```{code-cell} ipython3
 timeit(ΓΠ.Υ2C(ΓΠ.fib_fast)({})(23)[1])
 ```
 
-But still blows the recursion limit:
+Still blows the recursion limit:
 
 ```{code-cell} ipython3
 try:
@@ -950,7 +947,7 @@ except RecursionError as e:
 
 +++
 
-Currying is useful in general, but complicates this case. Get rid of it.
+Before tail-recursion, show the memo as un-Curried. Currying is useful in general, but complicates this case. Get rid of it.
 
 ```{code-cell} ipython3
 DEFINE('fib_fast_uncurried',
@@ -1002,12 +999,12 @@ The recursion limit is a little higher, but we don't want any of that.
 
 ```{code-cell} ipython3
 try:
-    print(ΓΠ.Υ2(ΓΠ.fib_fast_uncurried)({}, 246)[1])
+    print(ΓΠ.Υ2(ΓΠ.fib_fast_uncurried)({}, 250)[1])
 except RecursionError as e:
     print(e.args)
     
 try:
-    print(ΓΠ.Υ2(ΓΠ.fib_fast_uncurried)({}, 245)[1])
+    print(ΓΠ.Υ2(ΓΠ.fib_fast_uncurried)({}, 240)[1])
 except RecursionError as e:
     print(e.args)
 ```
@@ -1097,7 +1094,7 @@ except RecursionError as e:
     print(e.args)
     
 try:
-    print(LOOP5(ΓΠ.fib_tc_memo)(0, 1, {}, 500, 500)[1])
+    print(LOOP5(ΓΠ.fib_tc_memo)(0, 1, {}, 5000, 5000)[1])
 except RecursionError as e:
     print(e.args)
 ```
@@ -1118,6 +1115,10 @@ except RecursionError as e:
 +++
 
 # LABELS
+
++++
+
+TODO
 
 +++
 
@@ -1155,19 +1156,6 @@ def SET_BANG(
 Sequencing of statements and expressions is not fundamental. Instead, we must chain $\lambda$s. The paper calls the form `BLOCK`. Scheme calls it `BEGIN`. Common Lisp calls it `PROGN`.
 
 +++
-
-## 1-THUNK Convention: Statements are 1-Thunks
-
-+++
-
-In the logician's $\lambda$-calculus, all $\lambda$-forms take one parameter. In Schemulator, procedures of one parameter are ***1-Thunks***, just as procedures of no parameters are ***thunks***. We need to pass the output of one 1-thunk to the next 1-thunk so as to force time-order of execution to follow dependency order of argument evaluation by function application, i.e, to follow applicative-order semantics. Haskell calls such forcing "scheduling." That might be a bit of a heavy word for the forcing because there is no run-time scheduler: it's all done at compile time.
-
-```{code-cell} ipython3
-def THUNK1(body: Any,
-           π: Environment = ΓΠ):
-    ρ = Λ(lambda π: body, ['_'], π=π)
-    return ρ
-```
 
 Use `_` as a dummy parameter, as does Python.
 
@@ -1215,15 +1203,19 @@ BEGIN = BLOCK
 
 +++
 
-`LET_STAR` is sequential binding of locals. `LET` is parallel binding. `LETREC` is mutually recursive `LET`.
+`LET_STAR` is sequential binding of locals, syntactically like assignment, but purely with $\lambda$ expressions. Later definitions may depend on earlier ones. `LET` is parallel binding, where bindings are independent. `LETREC` is mutually recursive `LET`, where earlier bindings may depend on all other bindings in the form.
 
 +++
 
-Remember that $\Xi$ is a [Greek](#greek) shortcut for [`Application`](#application). Body of any of the _Lets_ must be an `Application` so that the environment $\pi$ can be propagated.
+Remember that $\Xi$ is a [Greek](#greek) shortcut for [`Application`](#application). Body of any of the _Lets_ must be an `Application` so that the environment $\pi$ can be propagated at the point where it is known.
 
 +++
 
 > ***Results are undefined if the body is not an [`Application`](#application) or $\Xi$.***
+
++++
+
+## LET*<a id="let-star"></a>
 
 ```{code-cell} ipython3
 def LET_STAR(
@@ -1249,36 +1241,111 @@ def LET_STAR(
 Test depth 0:
 
 ```{code-cell} ipython3
-print(LET_STAR([], 
-               Ξ(Λ(lambda π: print(43 * 42)))))
+LET_STAR([], 
+         Ξ(Λ(lambda π: print(43 * 42))))
 ```
 
 Test depth 1:
 
 ```{code-cell} ipython3
-print(LET_STAR([('z', 42)], 
-               Ξ(ΓΠ.square, [Var('z')])))
+LET_STAR([('z', 42)], 
+         Ξ(ΓΠ.square, [Var('z')]))
 ```
 
 Test depth 2:
 
 ```{code-cell} ipython3
-print(LET_STAR([('z', 42), ('y', 43)], 
-               Ξ(Λ(lambda π: print(π.z * π.y)))))
+LET_STAR([('z', 42), ('y', 43)], 
+         Ξ(Λ(lambda π: print(π.z * π.y))))
 ```
 
 Test depth 3, plus dependence on earlier definitions:
 
 ```{code-cell} ipython3
-print(LET_STAR([('z', 42), ('y', 43), 
-                ('w', 
-                 Ξ(Λ(lambda π: π.z * π.y, ['z', 'y']), 
-                   [Var('z'), Var('y')]))
-               ], 
-               body=Ξ(Λ(lambda π: print(π.w)))))
+LET_STAR([('z', 42), 
+          ('y', 43), 
+          ('w', Ξ(Λ(lambda π: π.z * π.y, ['z', 'y']), 
+                  [Var('z'), Var('y')])
+          )], 
+         body=Ξ(Λ(lambda π: print(π.w))))
+```
+
+Fully unrolled:
+
+```{code-cell} ipython3
+LET_STAR([('z', 42), 
+          ('y', Ξ(Λ(lambda π: π.z + 1, ['z']),
+                  [Var('z')])), 
+          ('w', Ξ(Λ(lambda π: π.z * π.y, ['z', 'y']), 
+                  [Var('z'), Var('y')])
+          )], 
+         body=Ξ(Λ(lambda π: print(π.w))))
+```
+
+## LET<a id="let"></a>
+
++++
+
+`LET` is parallel "assignment." All variables must be bound in the enclosing environment and may not depend on one another. This implementation is not curried. `body` must be an [`Assignment`](#assignment). 
+
+```{code-cell} ipython3
+def LET(
+        binding_pairs: List[Tuple[str, Any]], 
+        body: Any, 
+        π: Environment = ΓΠ) -> Any:
+    if len(binding_pairs) == 0:
+        ρ = EVAL(body, π)
+        return ρ
+    keys = [pair[0] for pair in binding_pairs]
+    vals = [pair[1] for pair in binding_pairs]
+    νλ = Λ(lambda π:
+          EVAL(body, π),
+          keys, π=π)
+    ρ = APPLY(νλ, vals, π=π)
+    return ρ        
+```
+
+Test depth 0:
+
+```{code-cell} ipython3
+LET([], Ξ(Λ(lambda π: print(43 * 42))))
+```
+
+Test depth 1:
+
+```{code-cell} ipython3
+LET([('z', 42)], 
+    Ξ(ΓΠ.square, [Var('z')]))
+```
+
+Test depth 2:
+
+```{code-cell} ipython3
+LET([('z', 42), ('y', 43)], 
+         Ξ(Λ(lambda π: print(π.z * π.y))))
+```
+
+Reversed:
+
+```{code-cell} ipython3
+LET([('y', 42), ('z', 43)], 
+         Ξ(Λ(lambda π: print(π.z * π.y))))
+```
+
+With applications as values, also demonstrating that the inner `y` is evaluated, not any lurking in the global environment $\Gamma\Pi$:
+
+```{code-cell} ipython3
+DEFINE('y', 0)
+LET([('y', 42), 
+     ('z', Ξ(Λ(lambda π: 42 + 1)))], 
+         Ξ(Λ(lambda π: print(π.z * π.y))))
 ```
 
 # COND
+
++++
+
+TODO
 
 +++
 
