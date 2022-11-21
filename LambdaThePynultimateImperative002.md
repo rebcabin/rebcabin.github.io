@@ -19,7 +19,7 @@ kernelspec:
 #### Version 2
 #### Brian Beckman
 #### 12 Nov 2022
-#### License: [Creative Commons Attribution 4.0 International Public License](https://creativecommons.org/licenses/by/4.0/legalcode)
+#### [Creative Commons Attribution 4.0 International Public License](https://creativecommons.org/licenses/by/4.0/legalcode)
 
 +++
 
@@ -27,7 +27,7 @@ kernelspec:
 
 +++
 
-In a classic paper, [_Lambda, the Ultimate Imperative_](https://www.researchgate.net/publication/37596655_Lambda_The_Ultimate_Imperative), Steele and Sussman show how to model most imperative constructs with just _lambda_:
+In a classic paper, [_Lambda, the Ultimate Imperative_](https://www.researchgate.net/publication/37596655_Lambda_The_Ultimate_Imperative), Steele and Sussman show how to model most imperative constructs with just _lambda:_
 
 +++
 
@@ -51,7 +51,7 @@ The use-cases above are similar to those for a SQL algebraizer. Many SQL impleme
 
 +++
 
-We follow the paper more-or-less directly, with gleanings from [SICP](https://sarabander.github.io/sicp/).
+We follow the paper more-or-less directly, with refernce to [SICP](https://sarabander.github.io/sicp/).
 
 +++
 
@@ -75,11 +75,11 @@ We prefer designs that minimize cross-talk. Each facility -- transformation laye
 
 +++
 
-Contrast to a braided design, where each facility explicitly accounts for every other.
+Contrast to a braided design, where each facility explicitly accounts for every other. Such a design is not usually created on purpose: it accretes as semantics is bodged on to syntax trees. Correcting such a design requires total refactoring after-the-fact. It's much easier to get it right before-the-fact.
 
 +++
 
-# Environment and Frame
+# Environment and Frame<a id="environment"></a>
 
 +++
 
@@ -107,7 +107,7 @@ We note in passing that this works only for a single thread. [Clojure, for insta
 
 +++
 
-$\pi$ is a nice pun: it evokes $\pi\eta\rho\iota$, a Greek prefix meaning "surrounding."
+$\pi$ for an enclosing environment is a nice pun: it evokes $\pi\eta\rho\iota$, a Greek prefix meaning "surrounding."
 
 +++
 
@@ -127,7 +127,7 @@ We use ALL CAPS for system functions that implement Schemulator.
 
 +++
 
-We might model a binding as a pair, or as a row in a table, an element of a relation (subset of a Cartesian product), an element of a Python dictionary, or as an attribute of a Python object. We prefer the attribute model because it affords _dot_ notation for lookup, that is, `o.foo` rather than the dictionary's syntax `o['foo']`.
+We might model a binding as a pair, or as a row in a table, an element of a relation (subset of a Cartesian product), an element of a Python dictionary, or as an attribute of a Python object. We prefer the attribute model because it affords _dot_ notation for lookup, that is, `o.foo` rather than the dictionary's syntax `o['foo']`. Thanks to [divs1210](https://gist.github.com/divs1210?page=3) for this idea of modeling frames as dummy lambda functions, namely `lambda: None`, and assigning attributes to them.
 
 +++
 
@@ -143,19 +143,7 @@ If the definitions above are acceptable, the apparent contradiction in SICP is r
 
 +++
 
-Thanks to [divs1210](https://gist.github.com/divs1210?page=3) for the idea of modeling frames as dummy lambda functions, and assigning attributes to them.
-
-+++
-
-We override `__getattr__` to avoid a separate function for recursive lookup. We can't also override `__setaddr__` to call `setattr(self.$\phi$ ...)` because `self.$\phi$` diverges on `getattr(self.$\phi$ ...)`.
-
-+++
-
-There is a unique global environment, $\Gamma\Pi$, for each session.
-
-+++
-
-TODO: Coalesce $\Gamma\Pi$ with Python's global environment.
+In the Environment class, we override `__getattr__` to avoid a separate function for recursive lookup. We can't also override `__setaddr__` to call `setattr(self.$\phi$ ...)` because `self.$\phi$` diverges on `getattr(self.$\phi$ ...)`.
 
 ```{code-cell} ipython3
 from dataclasses import dataclass, field
@@ -166,7 +154,7 @@ class Environment:
     """Set attributes via settattr(env.ϕ, key, val). When getting
     attributes, it's ok to omit the ϕ because of overloaded 
     __getattr__."""
-    ϕ: FunctionType   # "frame," also nice place to hang attributes via 'setattr'
+    ϕ: FunctionType   # "frame," a nice place to hang attributes
     π: "Environment"  # via Greek πηρι, short name for 'enclosing'
     def _get_it(self, key: str) -> Any:
         "recursive lookup"
@@ -174,7 +162,7 @@ class Environment:
             ρ = getattr(self.ϕ, key)
         except AttributeError as _:
             if self.π is None:
-                raise NameError(f'Name {key} is unbound.')
+                raise NameError(f'Environment: Name {key} is unbound.')
             else:  # recurse
                 ρ = self.π.__getattr__(key)
         return ρ
@@ -193,6 +181,10 @@ class Environment:
 
 # Unique Global Environment $\Gamma\Pi$<a id="global-environment"></a>
 
++++
+
+The unique global environment is $\Gamma\Pi$, defined once for each session.
+
 ```{code-cell} ipython3
 ΓΠ = Environment(lambda: None, None)  # Γ for "global," Π for "environment"
 setattr(ΓΠ.ϕ, 'γόὂ', 43)
@@ -203,32 +195,51 @@ setattr(ΓΠ.ϕ, 'γόὂ', 43)
 
 +++
 
-A ___procedure___ is a pair of code and environment. ___Code___ is a dictionary of parameter names and a $\lambda$ expression. The $\lambda$, by convention, takes a sigle argument, $\pi$, the environment in which its formal parameters are bound to actual arguments via procedure application, as described in SICP 3.2. This convention seems to be the best we can do for composable $\lambda$s in Schemulator. For now, we support only positional arguments, one-to-one with the argument list. That's consistent with [Gambit Scheme](https://github.com/gambit/gambit), which reports "Wrong number of arguments ..." if the application has too many or too few arguments.
+From SICP again:
 
 +++
 
-By default, procedures are defined in the unique global environment, $\Gamma\Pi$.
+> A ___procedure___ is a pair of code and environment. 
+
++++
+
+___Code___ is a dictionary of parameter names and a $\lambda$ expression. The $\lambda$, by convention, takes a sigle argument, $\pi$, the environment in which its formal parameters are bound to actual arguments via procedure application, as described in SICP 3.2. This convention seems to be the best we can do for composable $\lambda$s in Schemulator. 
+
++++
+
+For now, we support only positional arguments, one-to-one with the argument list. That's consistent with [Gambit Scheme](https://github.com/gambit/gambit), which reports "Wrong number of arguments ..." if the application has too many or too few arguments.
+
++++
+
+By default, procedures are bound in the unique global environment, $\Gamma\Pi$.
+
++++
+
+A `Procedure` includes a `__call__` override for conveniently calling Procedures in their given environments.
 
 ```{code-cell} ipython3
 from typing import Dict, List, Tuple, Any
 Parameters = List[str]  # positional arguments only
 class Procedure: 
-    """forward reference; will be corrected."""
+    """forward reference; will be corrected. Needed to
+    spec APPLY."""
     pass
 def APPLY(proc: Procedure, 
           args: List[Any], 
           π: Environment = ΓΠ) -> Any:
-    """forward reference; will be corrected."""
+    """forward reference; will be corrected. Needed to
+    spec Procedure."""
     print(args)
 @dataclass
 class Procedure:
+    """Include __call__ override for convenient syntax."""
     code: Dict  # TODO: Check for duplicated symbols in `parameters`.
-    π: Environment=ΓΠ  # Defined in global environment by default.
+    π: Environment=ΓΠ  # bound in global environment by default
     def __call__(self, *args):
         return APPLY(self, args, self.π)
 ```
 
-Following the example for _square_ in SICP 3.2.1, let's define it in the global environment and test the invocation of `APPLY`:
+Following the example for _square_ in SICP 3.2.1, let's define it in the global environment and test the invocation of `APPLY`, which, for now, just prints its arguments.
 
 ```{code-cell} ipython3
 setattr(
@@ -245,7 +256,7 @@ setattr(
 
 +++
 
-Some syntactical help for anonymous procedures. Default parameter list is empty and default parent environment is the unique global environment $\Gamma{}\Pi$.
+Some syntactical help for anonymous procedures. Default parameter list is empty and default environment is the unique global environment $\Gamma{}\Pi$.
 
 ```{code-cell} ipython3
 def Λ(body: FunctionType, 
@@ -256,6 +267,8 @@ def Λ(body: FunctionType,
         π=π)
     return ρ
 ```
+
+Test the $\Lambda$ syntax with the current `APPLY`.
 
 ```{code-cell} ipython3
 setattr(
@@ -270,7 +283,7 @@ setattr(
 
 +++
 
-Sometimes, we want to interpret strings not as self-evaluating atoms but as references to variables in an environment. We test the type [after defining `EVAL`, below](#eval). `Var` is needed to delay evaluation in [LET_STAR](#let-star).
+Sometimes, we want to interpret strings not as self-evaluating atoms but as references to variables in an environment. We test the type [after defining `EVAL`, below](#eval). `Var` is needed to delay evaluation in [LET_STAR](#let-star) and other constructs.
 
 ```{code-cell} ipython3
 @dataclass
@@ -282,16 +295,21 @@ class Var():
 
 +++
 
-In $\lambda$-calculus, an _Application_ is an unevaluated list with a Procedure or symbol (`str`) in the first slot and unevaluated actual arguments in the remaining positions. This is needed in [LET_STAR](#let-star) to delay evaluation until the environment is established, where [EVAL](#eval) evaluates them in the proper environment $\pi$.
+In $\lambda$-calculus, an _Application_ is an unevaluated list with a Procedure or symbol (`str`) in the first slot and unevaluated actual arguments in the remaining positions. This is needed in [LET_STAR](#let-star) and related constructs to delay evaluation until the environment is established, where [EVAL](#eval) cant evaluate them.
 
 +++
 
-`Application` is a placeholder for a more general [QUOTE](#quote) mechanism.
+`Application` is a placeholder for a more general [QUOTE](#quote) mechanism (TODO).
+
++++
+
+`Application` includes a `__call__` override for natural calling syntax in parentheses (round brackets).
 
 ```{code-cell} ipython3
 from typing import Union, Any
 class Application:
-    """forward reference; corrected immediately below"""
+    """forward reference; corrected immediately below.
+    Needed to spec EVAL_APPLICATION"""
     pass
 def EVAL_APPLICATION(expr: Application, π: Environment = ΓΠ):
     """forward reference; corrected below"""
@@ -332,11 +350,11 @@ TODO
 
 +++
 
-work in progress
+`EVAL` calls `APPLY` for Applications. But `APPLY` calls `EVAL` on all arguments, so we must refer to the earlier forward reference for `APPLY` before defining `EVAL`. We test `EVAL` after [`APPLY` is corrected, below](#apply).
 
 +++
 
-`EVAL` calls `APPLY` for Applications. But `APPLY` calls `EVAL` on all arguments, so we must refer to the earlier forward reference for `APPLY` before defining `EVAL`. We get to test this after [`APPLY` is corrected, below](#apply).
+First, we correct `EVAL_APPLICATION`. The first slot of an `Application` may contain a string, which is looked up in the given environment, or an explicit procedure. To evaluation an `Application`, evaluate the arguments, then apply the procedure that is either found directly in or looked up from the string in the first slot of the `Application`.
 
 ```{code-cell} ipython3
 def EVAL_APPLICATION(expr: Application, π: Environment = ΓΠ) -> Any:
@@ -355,6 +373,8 @@ def EVAL_APPLICATION(expr: Application, π: Environment = ΓΠ) -> Any:
     ρ = APPLY(head, eargs, π)
     return ρ
 ```
+
+Types other than `Application`  or `Var` evaluate to themselves.
 
 ```{code-cell} ipython3
 from typing import Any, Dict, Tuple, List
@@ -389,7 +409,7 @@ def EVAL(expr: Any, π: Environment = ΓΠ) -> Any:
 
 +++
 
-We defined the little [Greek](#greek) system-test variable `γόὂ` in [section "Global Environment"](#global-environment).
+We bound the little [Greek](#greek) system-test variable `γόὂ` in [section "Global Environment"](#global-environment).
 
 ```{code-cell} ipython3
 EVAL(Var('γόὂ'))
@@ -400,6 +420,10 @@ EVAL(Var('γόὂ'))
 +++
 
 By default, procedures are applied in the unique global environment, $\Gamma\Pi$.
+
++++
+
+Proceudures make a new environment, parented in the given environment, and bind parameters in the new environment to actual arguments evaluated in the old, given environment.
 
 ```{code-cell} ipython3
 class IllegalArgumentsError(ValueError):
@@ -442,6 +466,10 @@ Test multiple parameters and arguments:
 
 ### Test Application
 
++++
+
+`Application` makes a new environment for any variables.
+
 ```{code-cell} ipython3
 EVAL(Application(ΓΠ.square, [5]))
 ```
@@ -452,8 +480,53 @@ Test the [Greek](#greek) shortcut for `Application`:
 EVAL(Ξ('square', [42]))
 ```
 
+`Applications` require `Vars` to help with environments.
+
 ```{code-cell} ipython3
 EVAL(Ξ('square', [Var('γόὂ')]))
+```
+
+`Applications` may have explicit Procedures in their first slot:
+
+```{code-cell} ipython3
+EVAL(Ξ(Λ(lambda π: π.x * π.x, ['x']), [Var('γόὂ')]))
+```
+
+$\Xi$ honors sub-environments:
+
+```{code-cell} ipython3
+Λ(lambda π:
+  EVAL(Ξ('square', [Var('ϕοοβαρ')]), π),
+  ['ϕοοβαρ'])(42)
+```
+
+```{code-cell} ipython3
+Λ(lambda π:
+  EVAL(Ξ(Λ(lambda π: π.x * π.x, ['x']), 
+         [Var('ϕοοβαρ')]), π),
+  ['ϕοοβαρ'])(42)
+```
+
+$\phi\omicron\omicron\beta\alpha\rho$ is not bound in the enclosing global environment $\Gamma\Pi$:
+
+```{code-cell} ipython3
+try:
+    Λ(lambda π:
+      EVAL(Ξ('square', [Var('ϕοοβαρ')]), ΓΠ),
+      ['ϕοοβαρ'])(42)
+except NameError as e:
+    print(e.args)
+```
+
+Without `VAR`, $\phi\omicron\omicron\beta\alpha\rho$ is a string. Incidentally, `square` casts the first instance to `Sequence`.
+
+```{code-cell} ipython3
+try:
+    Λ(lambda π:
+      EVAL(Ξ('square', ['ϕοοβαρ']), π),
+      ['ϕοοβαρ'])(42)
+except TypeError as e:
+    print(e.args)
 ```
 
 ## DEFINE(sym, val, $\pi$)
@@ -464,7 +537,7 @@ Package up the "defining" boilerplate.
 
 +++
 
-By default, symbols are defined in the unique global environment, $\Gamma\Pi$.
+By default, `DEFINE` binds symbols in $\Gamma\Pi$.
 
 ```{code-cell} ipython3
 def DEFINE(sym: str, val: Any, π: Environment=ΓΠ) -> None:
@@ -493,7 +566,7 @@ DEFINE('f',
 ΓΠ.f(5)
 ```
 
-### Exercise 3.9
+### SICP Exercise 3.9
 
 ```{code-cell} ipython3
 DEFINE('factorial',
@@ -607,7 +680,7 @@ The running example is recursive factorial.
 
 +++
 
-Don't forget non-default $\pi$ on the inner lest `sf` be undefined.
+Don't forget non-default $\pi$ on the inner lest `sf` be unbound.
 
 ```{code-cell} ipython3
 Λ(lambda π: 
@@ -743,11 +816,19 @@ DEFINE('fact_iter', # domain code is a function of f ...
 
 +++
 
-Thanks to [Thomas Baruchel for this idea on tail recursion](https://stackoverflow.com/questions/13591970/does-python-optimize-tail-recursion). If users are aware that their domain code is tail-recursive, then they may call it via `LOOP` instead of via $\Upsilon$. In Scheme, detection of tail recursion is automatic. In Python and Schemulator, users must invoke tail recursion explicitly. This isn't terrible. Tail-calls are lexically obvious, so users should always know. In Clojure, there is precedent. Users must explicitly write `loop` and `recur`. In any event, domain code can always be called via the proper, non-tail-recursive $\Upsilon$, the one that knows the count of business parameters.
+Thanks to [Thomas Baruchel for this idea on tail recursion](https://stackoverflow.com/questions/13591970/does-python-optimize-tail-recursion). 
 
 +++
 
-We imitate Clojure's names `loop` and `recur`. The glyph that looks like "P" below is Greek Capital Rho for "recur." `LOOP3` has the same signature as $\Upsilon3$; it takes domain code as its sole argument. Names in user code should not collide with P if users remember that they should [avoid Greek in user code](#greek). As with $\Upsilon$, Rho and `LOOP` must know their argument counts. That's OK for now (TODO: reconsider).
+If users are aware that their domain code is tail-recursive, then they may call it via `LOOP` instead of via $\Upsilon$. In Scheme, detection of tail recursion is automatic. In Python and Schemulator, users must invoke tail recursion explicitly. This isn't terrible. Tail-calls are lexically obvious, so users should always know. In Clojure, there is precedent: users explicitly write `loop` and `recur`. In any event, domain code can always be called via the proper, non-tail-recursive $\Upsilon$, the one that knows the count of business parameters. In our implementation, we imitate Clojure's names `loop` and `recur`. 
+
++++
+
+`LOOP3` has the same signature as $\Upsilon3$; it takes domain code with business code of three arguments as its sole argument. 
+
++++
+
+The glyph that looks like "P" below is Greek Capital Rho for "recur." Names in user code will not collide with P if users remember to [avoid Greek](#greek). As with $\Upsilon$, Rho and `LOOP` must know their argument counts. That's OK for now (TODO: reconsider).
 
 ```{code-cell} ipython3
 class TailCall(Exception):  
@@ -788,7 +869,7 @@ The recursive version blows Python's recursion limit.
 
 ```{code-cell} ipython3
 try:
-    print(ΓΠ.Υ3(ΓΠ.fact_iter)(1, 1, 371))  # smallest that blows the limit
+    print(ΓΠ.Υ3(ΓΠ.fact_iter)(1, 1, 400))
 except RecursionError as e:
     print(e.args)
 ```
@@ -797,7 +878,7 @@ The tail-call version does not. Notice the domain code `fact_iter` is EXACTLY th
 
 ```{code-cell} ipython3
 try:
-    print(LOOP3(ΓΠ.fact_iter)(1, 1, 371))
+    print(LOOP3(ΓΠ.fact_iter)(1, 1, 400))
 except RecursionError as e:
     print(e.args)
 ```
@@ -824,13 +905,13 @@ This is miserable even for $n=23$. You won't want to call it for bigger argument
 ΓΠ.Υ1(ΓΠ.fib_slow)(23)
 ```
 
-The following takes 10 seconds. Uncomment if you want proof.
+The following takes 10 seconds. Uncomment if you want to see the time per iteration: about 1,000 ms; YES, a full second!
 
 ```{code-cell} ipython3
 # timeit(ΓΠ.Υ1(ΓΠ.fib_slow)(23))
 ```
 
-Without linearization, Fibonacci 500 would not complete in $10^{30}$ times the Age of the Universe. One way to linearize is tail recursion. Another way is [memoization](#memoization) (_sic:_ not _memorization_). 
+Without linearization, Fibonacci 500 would not complete in $10^{30}$ times the Age of the Universe. One way to linearize is tail recursion. Another way is [memoization](#memoization) (_sic:_ not _memorization_).
 
 +++
 
@@ -855,19 +936,23 @@ Time it:
 
 +++
 
-The following takes 10 seconds. Uncomment if you want proof.
+The following takes 10 seconds. Uncomment if you want see 250 _micro_ seconds, or so, 4000 times faster.
 
 ```{code-cell} ipython3
 # timeit(LOOP3(ΓΠ.fib_iter)(0, 1, 23))
 ```
 
-4000 times faster. Stress it, remembering that the non-tail-recursive version would not complete in astronimical time:
+Stress it, remembering that the non-tail-recursive version would not complete in astronimical time:
 
 ```{code-cell} ipython3
 LOOP3(ΓΠ.fib_iter)(0, 1, 5000)
 ```
 
 # Memoized [sic] Fibonacci<a id="memoization"></a>
+
++++
+
+Fibonacci can be linearized by recording intermediate results in a memo table instead of recomputing them. This is an easy instance of [_Dynamic Programming_](https://en.wikipedia.org/wiki/Dynamic_programming). 
 
 +++
 
@@ -890,7 +975,7 @@ DEFINE('Υ2C',
          ['d']));
 ```
 
-The domain code for a memoized, Curried Fibonacci follows. The parameter `a` is the _accumulator_, _associator_, or memo, whatever word you like best. This is easiest to read (and to write) from the bottom up. It looks horrendous, but it isn't really.
+The domain code for a memoized, Curried Fibonacci follows. The parameter `a` is the _accumulator_, _associator_, or memo table, whatever word you like best. This is easiest to read (and to write) from the bottom up. It looks horrendous, but it isn't really.
 
 ```{code-cell} ipython3
 DEFINE('fib_fast',
@@ -929,11 +1014,7 @@ DEFINE('fib_fast',
 ΓΠ.Υ2C(ΓΠ.fib_fast)({})(23)[1]
 ```
 
-1,000 times faster than the original, but stil not tail-recursive:
-
-+++
-
-The following takes 10 seconds. Uncomment if you want proof.
+It's about 1 millisecond per iteration, 1,000 times faster than the original. The following takes 10 seconds. Uncomment if you want proof.
 
 ```{code-cell} ipython3
 # timeit(ΓΠ.Υ2C(ΓΠ.fib_fast)({})(23)[1])
@@ -943,12 +1024,7 @@ Still blows the recursion limit:
 
 ```{code-cell} ipython3
 try:
-    print(ΓΠ.Υ2C(ΓΠ.fib_fast)({})(185)[1])
-except RecursionError as e:
-    print(e.args)
-
-try:
-    print(ΓΠ.Υ2C(ΓΠ.fib_fast)({})(184)[1])
+    print(ΓΠ.Υ2C(ΓΠ.fib_fast)({})(200)[1])
 except RecursionError as e:
     print(e.args)
 ```
@@ -957,7 +1033,7 @@ except RecursionError as e:
 
 +++
 
-Before tail-recursion, show the memo as un-Curried. Currying is useful in general, but complicates this case. Get rid of it.
+Before tail-recursion, show the memo as un-Curried. Currying is useful in general, but complicates $\Upsilon$. Get rid of it.
 
 ```{code-cell} ipython3
 DEFINE('fib_fast_uncurried',
@@ -991,7 +1067,7 @@ DEFINE('fib_fast_uncurried',
         ['f'])); # domain-code signature
 ```
 
-Need $\Upsilon2$ to call it:
+Need ordinary $\Upsilon2$ to call it:
 
 ```{code-cell} ipython3
 DEFINE('Υ2', 
@@ -1009,12 +1085,7 @@ The recursion limit is a little higher, but we don't want any of that.
 
 ```{code-cell} ipython3
 try:
-    print(ΓΠ.Υ2(ΓΠ.fib_fast_uncurried)({}, 250)[1])
-except RecursionError as e:
-    print(e.args)
-    
-try:
-    print(ΓΠ.Υ2(ΓΠ.fib_fast_uncurried)({}, 240)[1])
+    print(ΓΠ.Υ2(ΓΠ.fib_fast_uncurried)({}, 200)[1])
 except RecursionError as e:
     print(e.args)
 ```
@@ -1101,8 +1172,10 @@ LOOP5(ΓΠ.fib_tc_memo)(0, 1, {}, 23, 23)
 try:
     print(ΓΠ.Υ5(ΓΠ.fib_tc_memo)(0, 1, {}, 500, 500)[1])
 except RecursionError as e:
-    print(e.args)
-    
+    print(e.args)    
+```
+
+```{code-cell} ipython3
 try:
     print(LOOP5(ΓΠ.fib_tc_memo)(0, 1, {}, 5000, 5000)[1])
 except RecursionError as e:
@@ -1124,15 +1197,15 @@ except RecursionError as e:
 
 +++
 
-# LABELS
-
-+++
-
-TODO
-
-+++
-
 # SET_BANG
+
++++
+
+This is assignment without lambda. We do better later, but SICP and _Lambda the Ultimate Imperative_ use it. Implement it to complete coverage of Chapter 3 of SICP.
+
++++
+
+This has its own recursive lookup, exactly the same as that in [`Procedure`](#procedure), just for a different purpose. 
 
 +++
 
@@ -1152,7 +1225,7 @@ def SET_BANG(
             break
         except AttributeError as _:
             if π.π is None:
-                raise NameError(f'Name {sym} is unbound.')
+                raise NameError(f'Set!: Name {sym} is unbound.')
             else:  # recurse
                 π = π.π
     setattr(π.ϕ, sym, ee)
@@ -1163,7 +1236,7 @@ def SET_BANG(
 
 +++
 
-Sequencing of statements and expressions is not fundamental. Instead, we must chain $\lambda$s. All but the last $\lambda$ are for side-effec and must return `None`. 
+Sequencing of statements and expressions is not fundamental. Instead, we must chain $\lambda$s. All but the last $\lambda$ are for side-effect. They take one argument and return `None`.
 
 +++
 
@@ -1252,7 +1325,7 @@ BEGIN = BLOCK
 
 +++
 
-`LET_STAR` is sequential binding of locals, syntactically like assignment, but purely with $\lambda$ expressions. Later definitions may depend on earlier ones. `LET` is parallel binding, where bindings are independent. `LETREC` is mutually recursive `LET`, where earlier bindings may depend on all other bindings in the form.
+`LET_STAR` is sequential binding of locals, syntactically like assignment, but purely with $\lambda$ expressions. Later bindings may depend on earlier ones. `LET` is parallel binding, where bindings are independent. `LETREC` is mutually recursive `LET`, where earlier bindings may depend on all other bindings in the form.
 
 +++
 
@@ -1308,7 +1381,7 @@ LET_STAR([('z', 42), ('y', 43)],
          Ξ(Λ(lambda π: print(π.z * π.y))))
 ```
 
-Test depth 3, plus dependence on earlier definitions:
+Test depth 3, plus dependence on earlier bindings:
 
 ```{code-cell} ipython3
 LET_STAR([('z', 42), 
@@ -1335,7 +1408,7 @@ LET_STAR([('z', 42),
 
 +++
 
-`LET` is parallel "assignment." All variables must be bound in the enclosing environment and may not depend on one another. This implementation is not curried. `body` must be an [`Assignment`](#assignment). 
+`LET` is parallel "assignment." All variables must be bound in the enclosing environment and may not depend on one another. This implementation is not curried. `body` must be an [`Assignment`](#assignment).
 
 ```{code-cell} ipython3
 def LET(
@@ -1368,7 +1441,7 @@ LET([('z', 42)],
     Ξ(ΓΠ.square, [Var('z')]))
 ```
 
-Test depth 2:Γ
+Test depth 2:
 
 ```{code-cell} ipython3
 LET([('z', 42), ('y', 43)], 
@@ -1412,6 +1485,10 @@ except NameError as e:
 
 ## LETREC
 
++++
+
+`LETREC` must introduce a new environment to contain the mutually recursive bindings _before_ they're evaluated. `LET` evaluates them in the provided environment before they're bound.
+
 ```{code-cell} ipython3
 def LETREC(
         binding_pairs: List[Tuple[str, Any]], 
@@ -1422,18 +1499,71 @@ def LETREC(
         return ρ
     keys = [pair[0] for pair in binding_pairs]
     vals = [pair[1] for pair in binding_pairs]
+    E1 = Environment(lambda: None, π)
+    _ = [setattr(E1.ϕ, pair[0], pair[1])
+         for pair in binding_pairs]
     νλ = Λ(lambda π:
-           EVAL(body, π),
-           keys, π=π)
-    ρ = APPLY(νλ, vals, π=π)
+          EVAL(body, π),
+          keys, π=π)
+    ρ = APPLY(νλ, vals, π=E1)
     return ρ        
+```
+
+Internal recursive references must be EVAL'ed in-situ to access the propagated environment. Otherwise, LETREC is the same as LET
+
+```{code-cell} ipython3
+LETREC([('z0', Ξ(Λ(lambda π: 1 + EVAL(π.y0, π)))),
+        ('y0', Ξ(Λ(lambda π: 42)))],
+       Ξ(Λ(lambda π: π.z0 * π.y0)))
+```
+
+### How to Debug Environments
+
++++
+
+The following shows the chain of environments, plus it shows a technique for `print`-debugging of environments.
+
+```{code-cell} ipython3
+LETREC([('z0', Ξ(Λ(lambda π: 
+                   BLOCK(
+                       Λ(lambda π: print(π), ['_']),
+                       Λ(lambda π: print(ΓΠ), ['_']),
+                       Λ(lambda π: 1 + EVAL(π.y0, π), ['_']),
+                       π=π),
+                       ))),
+        ('y0', Ξ(Λ(lambda π: 42)))],
+       Ξ(Λ(lambda π: π.z0 * π.y0)))
+```
+
+The only difference in the following is `LET` instead of `LETREC`, showing that the required variable `y0` is unbound.
+
+```{code-cell} ipython3
+try:
+    LET([('z0', Ξ(Λ(lambda π: 
+                    BLOCK(
+                        Λ(lambda π: print(π), ['_']),
+                        Λ(lambda π: print(ΓΠ), ['_']),
+                        Λ(lambda π: 1 + EVAL(π.y0, π), ['_']),
+                        π=π),
+                       ))),
+        ('y0', Ξ(Λ(lambda π: 42)))],
+       Ξ(Λ(lambda π: π.z0 * π.y0)))
+except NameError as e:
+    print(e.args)
+```
+
+The following shows that the bindings of `y0` and `z0` do not leak from `LETREC`:
+
+```{code-cell} ipython3
+try:
+    print(ΓΠ.z0)
+except NameError as e:
+    print(e.args)
 ```
 
 ```{code-cell} ipython3
 try:
-    LETREC([('z0', Ξ(Λ(lambda π: 1 + (π.y0)()))),
-            ('y0', Ξ(Λ(lambda π: 42)))],
-        Ξ(Λ(lambda π: π.z0 * π.y0)))
+    print(ΓΠ.y0)
 except NameError as e:
     print(e.args)
 ```
