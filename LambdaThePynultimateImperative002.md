@@ -1236,7 +1236,7 @@ def SET_BANG(
 
 +++
 
-Sequencing of statements and expressions is not fundamental. Instead, we must chain $\lambda$s. All but the last $\lambda$ are for side-effect. They take one argument and return `None`.
+Sequencing of statements and expressions is not fundamental. Instead, we must chain $\lambda$s. All but the last $\lambda$ are for side-effect. They must be ***thunks*** -- procedures of no arguments -- and may return any value. All but the last value are discarded.
 
 +++
 
@@ -1251,37 +1251,34 @@ def BLOCK(*ss: List[Procedure],
          π: Environment = ΓΠ) -> Any:
     ρ = None
     for s in ss:
-        if ρ is not None:
-            ρ = APPLY(s, 
-                      [APPLY( ρ, [None], π=π)],
-                      π=π)
-        else:
-            ρ = APPLY(s, [None], π)
+        ρ = APPLY(s, [], π=π)
     return ρ
 ```
 
 ```{code-cell} ipython3
 DEFINE('x', 0)
 BLOCK(
-    Λ(lambda π: SET_BANG('x', 6, π), ['_']), 
-    Λ(lambda π: π.x * 7, ['_']))
+    Λ(lambda π: SET_BANG('x', 6, π)), 
+    Λ(lambda π: π.x * 7))
 ```
 
 ```{code-cell} ipython3
 DEFINE('y', 42)
 BLOCK(
-    Λ(lambda π: SET_BANG('x', 6, π), ['_']), 
-    Λ(lambda π: SET_BANG('x', π.x * 7, π), ['_']),
-    Λ(lambda π: π.x * π.y, ['_']))
+    Λ(lambda π: SET_BANG('x', 6, π)), 
+    Λ(lambda π: SET_BANG('x', π.x * 7, π)),
+    Λ(lambda π: π.x * π.y))
 ```
+
+Check for unbound variables.
 
 ```{code-cell} ipython3
 try:
     BLOCK(
-        Λ(lambda π: SET_BANG('x', 6, π), ['_']), 
-        Λ(lambda π: SET_BANG('x', π.x * 7, π), ['_']),
-        Λ(lambda π: print(π.x * π.y), ['_']),
-        Λ(lambda π: π.z, ['_']))
+        Λ(lambda π: SET_BANG('x', 6, π)), 
+        Λ(lambda π: SET_BANG('x', π.x * 7, π)),
+        Λ(lambda π: print(π.x * π.y)),
+        Λ(lambda π: π.z))
 except NameError as e:
     print(e.args)
 ```
@@ -1293,9 +1290,9 @@ try:
     Λ(lambda π: 
       print(
       BLOCK(
-          Λ(lambda π: SET_BANG('x1', 7, π), ['_'], π),
-          Λ(lambda π: SET_BANG('y1', 6, π), ['_'], π),
-          Λ(lambda π: π.x1 * π.y1, ['_'], π),
+          Λ(lambda π: SET_BANG('x1', 7, π), π=π),
+          Λ(lambda π: SET_BANG('y1', 6, π), π=π),
+          Λ(lambda π: π.x1 * π.y1, π=π),
           π=π
       )),
       ['x1', 'y1'])(0, 0)
@@ -1316,6 +1313,39 @@ try:
 except NameError as e:
     print(e.args)
 ```
+
+Check that intermediate lambdas that don't return `None` are NOT a problem:
+
+```{code-cell} ipython3
+BLOCK(
+    Λ(lambda π: SET_BANG('x', 6, π)), 
+    Λ(lambda π: SET_BANG('x', π.x * 7, π)),
+    Λ(lambda π: π.x * π.y),
+    Λ(lambda π: π.x * π.y))
+```
+
+```{code-cell} ipython3
+try:
+    print(BLOCK(
+        Λ(lambda π: SET_BANG('x', 6, π)), 
+        Λ(lambda π: SET_BANG('x', π.x * 7, π)),
+        Λ(lambda π: π.x * π.y),
+        Λ(lambda π: π.x * π.y)))
+except AttributeError as e:
+    print(e.args)
+```
+
+Check nested `BLOCK`s. Don't forget to wrap the nested `BLOCK` in a thunk!
+
+```{code-cell} ipython3
+BLOCK(
+    Λ(lambda π: SET_BANG('x', 6, π)), 
+    Λ(lambda π:  # <~~~ Don't forget to wrap it!
+      BLOCK(Λ(lambda π: SET_BANG('x', π.x * 7, π)),
+            Λ(lambda π: π.x * π.y))))
+```
+
+Define the Scheme-like synonym `BEGIN` for `BLOCK`:
 
 ```{code-cell} ipython3
 BEGIN = BLOCK
@@ -1483,6 +1513,16 @@ except NameError as e:
     print(e.args)
 ```
 
+Test nested `LET`. Don't forget to chain the environments! The default is $\Gamma\Pi$.
+
+```{code-cell} ipython3
+LET([('z0', Ξ(Λ(lambda π: 42)))],
+    Ξ(Λ(lambda π:
+        LET([('y0', Ξ(Λ(lambda π: π.z0 + 1)))],
+            Ξ(Λ(lambda π: π.z0 * π.y0)),
+            π=π))))  # <~~~ Don't forget to chain!
+```
+
 ## LETREC
 
 +++
@@ -1526,9 +1566,9 @@ The following shows the chain of environments, plus it shows a technique for `pr
 ```{code-cell} ipython3
 LETREC([('z0', Ξ(Λ(lambda π: 
                    BLOCK(
-                       Λ(lambda π: print(π), ['_']),
-                       Λ(lambda π: print(ΓΠ), ['_']),
-                       Λ(lambda π: 1 + EVAL(π.y0, π), ['_']),
+                       Λ(lambda π: print(π)),
+                       Λ(lambda π: print(ΓΠ)),
+                       Λ(lambda π: 1 + EVAL(π.y0, π)),
                        π=π),
                        ))),
         ('y0', Ξ(Λ(lambda π: 42)))],
@@ -1541,9 +1581,9 @@ The only difference in the following is `LET` instead of `LETREC`, showing that 
 try:
     LET([('z0', Ξ(Λ(lambda π: 
                     BLOCK(
-                        Λ(lambda π: print(π), ['_']),
-                        Λ(lambda π: print(ΓΠ), ['_']),
-                        Λ(lambda π: 1 + EVAL(π.y0, π), ['_']),
+                        Λ(lambda π: print(π)),
+                        Λ(lambda π: print(ΓΠ)),
+                        Λ(lambda π: 1 + EVAL(π.y0, π)),
                         π=π),
                        ))),
         ('y0', Ξ(Λ(lambda π: 42)))],
