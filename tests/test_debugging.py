@@ -10,8 +10,19 @@ from debugging import (
     EVAL,
     Var,
     APPLY,
-    IllegalArgumentsError, ECHO, Application, Ξ, EVAL_APPLICATION, DEFINE, LOOP3, LOOP5, BLOCK, SET_BANG, LET_STAR, LET,
-    LETREC)
+    IllegalArgumentsError,
+    ECHO,
+    Application,
+    Ξ,
+    DEFINE,
+    LOOP3,
+    LOOP5,
+    BLOCK,
+    SET_BANG,
+    LET_STAR,
+    LET,
+    LETREC,
+    LABELS)
 
 
 class TestEnvironment:
@@ -856,4 +867,30 @@ class TestLetRec:
 
 
 class TestLabels:
-    pass
+
+    def test_94_test_fact(self):
+        print("\n94...")
+        assert 720 == \
+               LABELS([('fact_iter_nom',
+                        Λ(lambda π:
+                          (π.a
+                           if π.m <= 0
+                           else π.fact_iter_nom(π.m - 1, π.a * π.m)),
+                          ['m', 'a']))],
+                      Ξ(Λ(lambda π: π.fact_iter_nom(6, 1))))
+
+    def test_95_test_racket(self):
+        print("\n95...")
+        assert (True, False, False, True) == \
+               LABELS([('is_even',
+                        Λ(lambda π: True if π.n == 0 else (not π.is_odd(π.n)),
+                          ['n'])),
+                       ('is_odd',
+                        Λ(lambda π: π.n != 0 and π.is_even(abs(π.n) - 1),
+                          ['n']))],
+                      Ξ(Λ(lambda π: (
+                          π.is_even(42),
+                          π.is_even(-43),
+                          π.is_odd(-42),
+                          π.is_odd(43),
+                      ))))

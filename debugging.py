@@ -8,11 +8,7 @@ def ECHO(key: str, x: Any) -> Any:
     return x
 
 
-from dataclasses import dataclass, field
-from typing import Any
-
-from dataclasses import dataclass, field
-from types import FunctionType
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -80,11 +76,11 @@ class Environment:
 
 ΓΠ = Environment(lambda: None, None)
 
-from typing import Dict, List, Tuple, Any
+from typing import List
 
 Parameters = List[str]  # positional, ordered arguments only
 
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Any
 
 Parameters = List[str]  # type synonym; positional, ordered arguments only
 
@@ -135,8 +131,6 @@ def Λ(body: "(π: Any) -> Any",
         π=π)
     return ρ
 
-
-from typing import Union, Any
 
 from typing import Union, Any
 
@@ -204,7 +198,7 @@ def EVAL_APPLICATION(expr: Application, π: Environment = ΓΠ) -> Any:
     return ρ
 
 
-from typing import Any, Dict, Tuple, List
+from typing import Any
 import numpy
 
 
@@ -611,3 +605,17 @@ def LETREC(
         body.π = E1
     ρ = EVAL(body, E1)
     return ρ
+
+
+def LABELS(
+        binding_pairs: List[Tuple[str, Any]],
+        body: Application,
+        π: Environment = ΓΠ
+) -> Any:
+    for pair in binding_pairs:
+        if not isinstance(pair[1], Procedure):
+            raise IllegalArgumentsError(
+                f'all values in labels must be Procedures; '
+                f'this value {pair[1]} is not')
+    result = LETREC(binding_pairs, body, π)
+    return result  # <~~~ Hang breakpoint here.
