@@ -1,6 +1,6 @@
 # rebcabin.github.io
 
-## How to Square the Square Root of a Function 
+## How to Square the Square Root of a Function
 
 - [Jupytext Notebook](https://github.com/rebcabin/rebcabin.github.io/blob/main/PythonYCombinators.ipynb)
 
@@ -16,6 +16,6 @@
 
 ## Lambda the Pynultimate Imperative
 
-- [Jupytext Notebook](https://github.com/rebcabin/rebcabin.github.io/blob/main/LambdaThePynultimateImperative002.ipynb)
+- [Jupytext Notebook](https://github.com/rebcabin/rebcabin.github.io/blob/main/LambdaThePynultimateImperative004.ipynb)
 
-- [Jupytext Markdown](https://github.com/rebcabin/rebcabin.github.io/blob/main/LambdaThePynultimateImperative002.md)
+- [Jupytext Markdown](https://github.com/rebcabin/rebcabin.github.io/blob/main/LambdaThePynultimateImperative004.md)
