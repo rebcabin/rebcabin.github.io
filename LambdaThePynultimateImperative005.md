@@ -18,7 +18,7 @@ kernelspec:
 
 #### Version 5
 #### Brian Beckman
-#### 19 Dec 2022
+#### 20 Dec 2022
 #### [Creative Commons Attribution 4.0 International Public License](https://creativecommons.org/licenses/by/4.0/legalcode)
 
 +++
@@ -2277,32 +2277,80 @@ LET_STAR([
 
 +++
 
-`LETREC` must bind codependent values in a new environment _before_ evaluating them. `LET` evaluates the values before binding them.
+`LETREC` must bind codependent values in a new environment _before_ evaluating them. `LET` evaluates the values before binding them. It then patches the environments of any contained procedures to ensure they have access to the new bindings. Patching inserts the new environment at the root of the procedure's environment. As an optimization, if the procedure's environment is empty, patching simply replaces it.
+
++++
+
+Test whether an environment is empty:
+
+```{code-cell} ipython3
+def _is_empty(π: Environment) -> bool:
+    result = (not π.__dict__)
+    return result
+```
+
+From a list of binding pairs, make a parented environment:
+
+```{code-cell} ipython3
+def _make_parented_env(
+        pairs: List[Tuple[str, Any]],
+        parent: Environment
+) -> Environment:
+    result = Environment(lambda: None, parent)
+    _ = [setattr(result.ϕ, pair_[0], pair_[1])
+         for pair_ in pairs]
+    return result
+```
+
+Make an optimized patched environment:
+
+```{code-cell} ipython3
+def _patched_env(
+        parent: Environment,
+        pairs: List[Tuple[str, Any]],
+        e: Environment
+) -> Environment:
+    result = (e if _is_empty(parent)
+              else _make_parented_env(pairs, e))
+    return result
+```
+
+Monkey patch an object if it's a procedure:
+
+```{code-cell} ipython3
+def _monkey_patch_env(
+        obj: Any,
+        pairs: List[Tuple[str, Any]],
+        e: Environment
+) -> None:
+    if isinstance(obj, Procedure):
+        obj.π = _patched_env(obj.π, pairs, e)
+```
+
+Finally, here is `LETREC`
 
 ```{code-cell} ipython3
 def LETREC(
-        binding_pairs: List[Tuple[str, Any]], 
-        body: Application, 
+        binding_pairs: List[Tuple[str, Any]],
+        body: Application,
         π: Environment = ΓΠ
 ) -> Any:
     if len(binding_pairs) == 0:
         ρ = EVAL(body, π)
         return ρ
-    E1 = Environment(lambda: None, π)
-    _ = [setattr(E1.ϕ, pair[0], pair[1])
-         for pair in binding_pairs]
-    # Monkey-patch environments for vals that are Procedures.
+    E1 = _make_parented_env(binding_pairs, π)
     for pair in binding_pairs:
-        if isinstance(pair[1], Procedure):
-            pair[1].π = E1
-    # Monkey patch the body, if it's a Procedure.
-    if isinstance(body, Procedure):
-        body.π = E1
+        _monkey_patch_env(pair[1], binding_pairs, E1)
+    _monkey_patch_env(body, binding_pairs, E1)
     ρ = EVAL(body, E1)
-    return ρ        
+    return ρ
 ```
 
 ### Examples
+
++++
+
+Factorial, familiar by now, accesses itself through the patched environment; `fact` is a free variable in the body of `fact`:
 
 ```{code-cell} ipython3
 LETREC([('fact', 
@@ -2312,6 +2360,21 @@ LETREC([('fact',
             else π.fact(π.m - 1, π.m * π.a)),
            ['m', 'a']))],
        Ξ(Λ(lambda π: π.fact(6, 1))))
+```
+
+Here is a version that fails if the patching is not done correctly:
+
+```{code-cell} ipython3
+Λ(lambda π: 
+  LETREC([('fact', 
+           Λ(lambda π: 
+             (π.a
+              if π.m <= π.m0  # <~~~ Watch out!
+              else π.fact(π.m - 1, π.m * π.a)),
+             ['m', 'a']))],
+         Ξ(Λ(lambda π: π.fact(6, 1))),
+         π),  # <~~~ access 'm0'
+ ['m0'])(0)
 ```
 
 The final application $\Xi$ is necessary to actually evaluate the final $\Lambda$, lest it be simply returned unevaluated:
@@ -2416,6 +2479,8 @@ def LABELS(
     return result  # <~~~ Hang breakpoint here.
 ```
 
+Our old friend, factorial:
+
 ```{code-cell} ipython3
 LABELS([('fact_iter_nom',
         Λ(lambda π: 
@@ -2426,13 +2491,20 @@ LABELS([('fact_iter_nom',
       Ξ(Λ(lambda π: π.fact_iter_nom(6, 1))))
 ```
 
+Test monkey patching again:
+
 ```{code-cell} ipython3
-ΓΠ.fact_iter_nom(6, 1)
+Λ(lambda πo: 
+  LABELS([('fact_iter_nom',
+           Λ(lambda π: 
+             (π.a 
+              if π.m <= π.m0  # <~~~ Watch out!
+              else π.fact_iter_nom(π.m - 1, π.a * π.m)),
+             ['m', 'a']))],
+         Ξ(Λ(lambda π: π.fact_iter_nom(6, 1))),
+         πo),
+  ['m0'])(1)  # <~~~ Works with 1, also.
 ```
-
-Let's do likewise with `LETREC`:
-
-+++
 
 # DO
 

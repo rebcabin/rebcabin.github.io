@@ -894,3 +894,49 @@ class TestLabels:
                           π.is_odd(-42),
                           π.is_odd(43),
                       ))))
+
+
+class TestPatching:
+
+    def test_96_patched_environments(self):
+        print("\n96...")
+        try:  # reduce noise in debugging displays
+            del ΓΠ.ϕ.γόὂ
+            del ΓΠ.ϕ.saxpy
+            del ΓΠ.ϕ.sum_of_squares
+            del ΓΠ.ϕ.factorial
+            del ΓΠ.ϕ.fact_iter
+            del ΓΠ.ϕ.fact_recursive
+            del ΓΠ.ϕ.fib_slow
+            del ΓΠ.ϕ.fib_iter
+            del ΓΠ.ϕ.fib_fast
+            del ΓΠ.ϕ.fib_fast_uncurried
+            del ΓΠ.ϕ.fib_tc_memo
+            del ΓΠ.ϕ.x
+            del ΓΠ.ϕ.y
+        except:
+            pass
+        assert 720 == \
+               Λ(lambda π:
+                 LETREC([('fact',
+                          Λ(lambda π:
+                            (π.a
+                             if π.m <= π.m0  # <~~~ Watch out!
+                             else π.fact(π.m - 1, π.m * π.a)),
+                            ['m', 'a']))],
+                        Ξ(Λ(lambda π: π.fact(6, 1))),
+                        π),  # <~~~ Access m0.
+                 ['m0'])(0)
+
+    def test_patching_again(self):
+        assert 720 == \
+               Λ(lambda πo:
+                 LABELS([('fact_iter_nom',
+                          Λ(lambda π:
+                            (π.a
+                             if π.m <= π.m0  # <~~~ Watch out!
+                             else π.fact_iter_nom(π.m - 1, π.a * π.m)),
+                            ['m', 'a']))],
+                        Ξ(Λ(lambda π: π.fact_iter_nom(6, 1))),
+                        πo),
+                 ['m0'])(1)  # <~~~ Works with 1, also.

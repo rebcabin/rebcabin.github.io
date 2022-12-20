@@ -585,6 +585,40 @@ def LET(
     return ρ
 
 
+def _make_parented_env(
+        pairs: List[Tuple[str, Any]],
+        parent: Environment
+) -> Environment:
+    result = Environment(lambda: None, parent)
+    _ = [setattr(result.ϕ, pair_[0], pair_[1])
+         for pair_ in pairs]
+    return result
+
+
+def _is_empty(π: Environment) -> bool:
+    result = (not π.__dict__)
+    return result
+
+
+def _patched_env(
+        parent: Environment,
+        pairs: List[Tuple[str, Any]],
+        e: Environment
+) -> Environment:
+    result = (e if _is_empty(parent)
+              else _make_parented_env(pairs, e))
+    return result
+
+
+def _monkey_patch_env(
+        obj: Any,
+        pairs: List[Tuple[str, Any]],
+        e: Environment
+) -> None:
+    if isinstance(obj, Procedure):
+        obj.π = _patched_env(obj.π, pairs, e)
+
+
 def LETREC(
         binding_pairs: List[Tuple[str, Any]],
         body: Application,
@@ -593,16 +627,10 @@ def LETREC(
     if len(binding_pairs) == 0:
         ρ = EVAL(body, π)
         return ρ
-    E1 = Environment(lambda: None, π)
-    _ = [setattr(E1.ϕ, pair[0], pair[1])
-         for pair in binding_pairs]
-    # Monkey-patch environments for vals that are Procedures.
+    E1 = _make_parented_env(binding_pairs, π)
     for pair in binding_pairs:
-        if isinstance(pair[1], Procedure):
-            pair[1].π = E1
-    # Monkey patch the body, if it's a Procedure.
-    if isinstance(body, Procedure):
-        body.π = E1
+        _monkey_patch_env(pair[1], binding_pairs, E1)
+    _monkey_patch_env(body, binding_pairs, E1)
     ρ = EVAL(body, E1)
     return ρ
 
@@ -619,3 +647,6 @@ def LABELS(
                 f'this value {pair[1]} is not')
     result = LETREC(binding_pairs, body, π)
     return result  # <~~~ Hang breakpoint here.
+
+
+def
