@@ -33,11 +33,11 @@ class Environment:
         return self.π is None
 
     def _is_empty(self):
-        return not self.ϕ.__dict__
+        return not vars(self.ϕ)
 
     def _copy(self) -> "Environment":
         e = Environment(lambda: None, self.π)
-        for k, v in self.ϕ.__dict__.items():
+        for k, v in vars(self.ϕ).items():
             setattr(e.ϕ, k, v)
         return e
 
@@ -164,7 +164,7 @@ class Environment:
         result = ("(" + hex(id(self.ϕ))[-4:] +
                   (",ΓΠ" if is_global else "") +
                   ") ") + \
-                 pformat(str(list(self.ϕ.__dict__.keys()))) + \
+                 pformat(str(list(vars(self.ϕ).keys()))) + \
                  (">" + self.π.__repr__()
                   if not is_global
                   else "")
@@ -442,10 +442,11 @@ def RECUR(*args):
 def LOOP3(d: Procedure) -> Procedure:  # domain code
     """in sincere flattery of Clojure, and thanks to Thomas Baruchel."""
     # in the global environment, ΓΠ,
+    nyms = ['α', 'β', 'γ']
     DEFINE('Ρ3',
            Λ(lambda π:
-             RECUR(π.m, π.c, π.x),
-             ['m', 'c', 'x']))
+             RECUR(*[π[nym] for nym in nyms]),
+             nyms))
 
     def looper(*args):
         """Expression form of a while-loop statement."""
@@ -456,8 +457,8 @@ def LOOP3(d: Procedure) -> Procedure:  # domain code
                 args = e.args
 
     ρ = Λ(lambda π:
-          looper(π.m, π.c, π.x),
-          ['m', 'c', 'x'],
+          looper(*[π[nym] for nym in nyms]),
+          nyms,
           π=d.π)
 
     return ρ
@@ -468,8 +469,8 @@ def LOOP1(d: Procedure) -> Procedure:  # domain code
     # in the global environment, ΓΠ,
     DEFINE('Ρ1',
            Λ(lambda π:
-             RECUR(π.m),
-             ['m']))
+             RECUR(π.α),
+             ['α']))
 
     def looper(*args):
         """Expression form of a while-loop statement."""
@@ -480,8 +481,8 @@ def LOOP1(d: Procedure) -> Procedure:  # domain code
                 args = e.args
 
     ρ = Λ(lambda π:
-          looper(π.m),
-          ['m'],
+          looper(π.α),
+          ['α'],
           π=d.π)
 
     return ρ
@@ -489,11 +490,12 @@ def LOOP1(d: Procedure) -> Procedure:  # domain code
 
 def LOOP2(d: Procedure) -> Procedure:  # domain code
     """in sincere flattery of Clojure, and thanks to Thomas Baruchel."""
+    nyms = ['α', 'β']
     # in the global environment, ΓΠ,
     DEFINE('Ρ2',
            Λ(lambda π:
-             RECUR(π.m, π.a),
-             ['m', 'a']))
+             RECUR(*[π[nym] for nym in nyms]),
+             nyms))
 
     def looper(*args):
         """Expression form of a while-loop statement."""
@@ -504,12 +506,14 @@ def LOOP2(d: Procedure) -> Procedure:  # domain code
                 args = e.args
 
     ρ = Λ(lambda π:
-          looper(π.m, π.a),
-          ['m', 'a'],
+          looper(*[π[nym] for nym in nyms]),
+          nyms,
           π=d.π)
 
     return ρ
 
+
+# Don't bother generalizing this one now:
 
 DEFINE('Υ2C',
        Λ(lambda π:  # function of domain code, d ...
@@ -518,7 +522,8 @@ DEFINE('Υ2C',
              Λ(lambda π:
                π.d(Λ(lambda π:
                      Λ(lambda π: π.sf(π.sf)(π.m)(π.n),
-                       ['n'], π), ['m'], π)),
+                       ['n'], π),
+                     ['m'], π)),
                ['sf'], π)),
          ['d']))
 
@@ -532,23 +537,35 @@ DEFINE('Υ2',
                ['sf'], π)),
          ['d']))
 
+DEFINE('ΥN',
+       Λ(lambda π:  # of d, the domain code and vars ...
+         Λ(lambda π: π.g(π.g), ['g'], π)(
+             # of business code of N parameters
+             Λ(lambda π:
+               π.d(Λ(lambda π: π.sf(π.sf)(
+                   *[π[var] for var in π.vars_]),
+                     π.vars_, π)),
+               ['sf'], π)),
+         ['d', 'vars_']))
+
 DEFINE('Υ5',
        Λ(lambda π:  # of d, the domain code ...
          Λ(lambda π: π.g(π.g), ['g'], π)(
              # of business code of five parameters
              Λ(lambda π: π.d(
-                 Λ(lambda π: π.sf(π.sf)(π.m, π.c, π.x, π.a, π.b),
-                   ['m', 'c', 'x', 'a', 'b'], π)),
+                 Λ(lambda π: π.sf(π.sf)(π.α, π.β, π.γ, π.δ, π.ζ),
+                   ['α', 'β', 'γ', 'δ', 'ζ'], π)),
                ['sf'], π)),
          ['d']))
 
 
 def LOOP5(d: Procedure) -> Procedure:
     """in sincere flattery of Clojure, and thanks to Thomas Baruchel."""
+    nyms = ['α', 'β', 'γ', 'δ', 'ζ']
     DEFINE('Ρ5',
            Λ(lambda π:
-             RECUR(π.m, π.c, π.x, π.a, π.b),
-             ['m', 'c', 'x', 'a', 'b']))
+             RECUR(*[π[nym] for nym in nyms]),
+             nyms))
 
     def looper(*args):
         """Expression form of a while-loop statement."""
@@ -559,8 +576,31 @@ def LOOP5(d: Procedure) -> Procedure:
                 args = e.args
 
     ρ = Λ(lambda π:
-          looper(π.m, π.c, π.x, π.a, π.b),
-          ['m', 'c', 'x', 'a', 'b'],
+          looper(*[π[nym] for nym in nyms]),
+          nyms,
+          π=d.π)
+
+    return ρ
+
+
+def LOOPN(d: Procedure, vars_: List[str]) -> Procedure:
+    """in sincere flattery of Clojure, and thanks to Thomas Baruchel."""
+    DEFINE('ΡN',
+           Λ(lambda π:
+             RECUR(*[π[var] for var in vars_]),
+             vars_))
+
+    def looper(*args):
+        """Expression form of a while-loop statement."""
+        while True:
+            try:
+                return d(ΓΠ.ΡN)(*args)
+            except TailCall as e:
+                args = e.args
+
+    ρ = Λ(lambda π:
+          looper(*[π[var] for var in vars_]),
+          vars_,
           π=d.π)
 
     return ρ
@@ -671,7 +711,7 @@ def CHECK_TYPE(x: Any, t: Any) -> Any:
     return x
 
 
-def DO(
+def DO_NTC(
         triples: List[Tuple[str, Any, Procedure]],
         pred: Procedure,
         value: Any,
@@ -681,12 +721,12 @@ def DO(
             (<var2> <init2> <λstep2>
             . . .
             (<varñ> <initñ> <λstepñ))
-            (<λpred> <value>)
-            <ξbody>
+            (<λpred> <λvalue>)
+            <λbody>
             <env=None>).
-    The <init>s and <step>s are evaluated in parallel, as with
-    Scheme "let". They may refer to any variables in the env.
-    See "dofact" for an example. """
+    Steps are evaluated sequentially.
+    Tail-recursive version requires a LOOPN.
+    """
     vars = [CHECK_TYPE(t[0], str) for t in triples]
     inits = [t[1] for t in triples]
     steps = [CHECK_TYPE(t[2], Procedure) for t in triples]
@@ -698,49 +738,59 @@ def DO(
     setattr(E1.ϕ, 'βody', CHECK_TYPE(body, Procedure))
     r = LABELS([(
         'λoop',
-        # Can't execute βody without BLOCK1 :)
-        BLOCK(
-            Λ(lambda π:
-              Λ(lambda π:
-                (EVAL(Ξ('vaλue'), π)
-                 if EVAL(Ξ('πred'), π)
-                 else π.λoop(
-                    *[EVAL(Ξ(f'σteps_{i}'), π)
-                      for i in range(len(steps))])),
-                vars)
-              ), π=π)
-    )],
+        Λ(lambda π:
+          (EVAL(Ξ('vaλue'), π)
+           if EVAL(Ξ('πred'), π)
+           else π.λoop(
+              EVAL(Ξ('βody'), π),
+              *[EVAL(Ξ(f'σteps_{i}'), π)
+                for i in range(len(steps))])),
+          ['βody_result', *vars]))],
         Ξ('λoop',
-          [EVAL(init, E1) for init in inits],
-          E1),
+          [None, *[EVAL(init, E1) for init in inits]]),
         E1)
     return r
 
-# BLOCK(
-#     Λ(lambda π: print()),
-#     Λ(lambda π: [pprint({f'step[{i}]': step}) for i, step in enumerate(steps)]),
-#     Λ(lambda π: pprint({'pred': pred})),
-#     Λ(lambda π: pprint({'value': value})),
-#     Λ(lambda π: pprint({'body': body})),
-#     Λ(lambda π: pprint({'m': E1.m, 'a': E1.a})),
-#     Λ(lambda π:
-#       (Ξ(value, π=E1)
-#        if Ξ(pred, π=E1)
-#        else
-#        Ξ(Λ(lambda π:
-#            π.loop(*[Ξ(step, π=E1) for step in steps])),
-#          π=E1)),
-#       vars,
-#       E1)(E1.m, E1.a),
-#     π=E1
-# )
 
-# Λ(lambda π:
-#   (Ξ(value, π=E1)
-#    if Ξ(pred, π=E1)
-#    else
-#    Ξ(Λ(lambda π:
-#        π.loop(*[Ξ(step, π=E1) for step in steps])),
-#      π=E1)),
-#   vars,
-#   E1)(E1.m, E1.a)
+def DO(
+        triples: List[Tuple[str, Any, Procedure]],
+        pred: Procedure,
+        value: Any,
+        body: Procedure,
+        π: Environment = ΓΠ):
+    """(DO ((<var1> <init1> <λstep1>)
+            (<var2> <init2> <λstep2>
+            . . .
+            (<varñ> <initñ> <λstepñ))
+            (<λpred> <λvalue>)
+            <λbody>
+            <env=None>).
+    Steps are evaluated sequentially.
+    Tail-recursive version requires a LOOPN.
+    """
+    vars = [CHECK_TYPE(t[0], str) for t in triples]
+    inits = [t[1] for t in triples]
+    steps = [CHECK_TYPE(t[2], Procedure) for t in triples]
+    E1 = Environment(lambda: None, π)
+    _ = [setattr(E1.ϕ, f'σteps_{i}', step)
+         for i, step in enumerate(steps)]
+    setattr(E1.ϕ, 'πred', CHECK_TYPE(pred, Procedure))
+    setattr(E1.ϕ, 'vaλue', CHECK_TYPE(value, Procedure))
+    setattr(E1.ϕ, 'βody', CHECK_TYPE(body, Procedure))
+    r = LABELS([(
+        'λoop',
+        Λ(lambda πd:  # Domain code is a functino of 'λf', ...
+          Λ(lambda π:  # ... which is busines code of N params.
+            (EVAL(Ξ('vaλue'), π)
+             if EVAL(Ξ('πred'), π)
+             else π.λf(  # <~~~ tail recursion
+                EVAL(Ξ('βody'), π),
+                *[EVAL(Ξ(f'σteps_{i}'), π)
+                  for i in range(len(steps))])),
+            ['βody_result', *vars], π=πd),
+          ['λf'], π=E1))],
+        Ξ(Λ(lambda π:
+            LOOPN(π.λoop, ['βody_result', *vars])
+            (None, *[EVAL(init, E1) for init in inits]))),
+        E1)
+    return r

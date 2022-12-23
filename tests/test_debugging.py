@@ -8,7 +8,7 @@ from debugging import (
     Application,
     BLOCK,
     DEFINE,
-    DO,
+    DO_NTC,
     ECHO,
     EVAL,
     Environment,
@@ -20,26 +20,27 @@ from debugging import (
     LOOP2,
     LOOP3,
     LOOP5,
+    LOOPN,
     Procedure,
     SET_BANG,
     Var,
     ΓΠ,
     Λ,
-    Ξ,
+    Ξ, DO,
 )
 
 
 class TestEnvironment:
 
     def test_ΓΠ(self):
-        # pprint({'ΓΠ': ΓΠ, 'ΓΠ.ϕ': ΓΠ.ϕ.__dict__})
+        # pprint({'ΓΠ': ΓΠ, 'ΓΠ.ϕ': vars(ΓΠ.ϕ)})
         assert ΓΠ.π is None
         assert ΓΠ._is_global()
         assert not ΓΠ._is_empty()
 
     def test_setattr(self):
         setattr(ΓΠ.ϕ, 'γόὂ', 43)
-        # pprint({'ΓΠ': ΓΠ, 'ΓΠ.ϕ': ΓΠ.ϕ.__dict__})
+        # pprint({'ΓΠ': ΓΠ, 'ΓΠ.ϕ': vars(ΓΠ.ϕ)})
         assert ΓΠ.γόὂ == 43
         del ΓΠ.ϕ.γόὂ
 
@@ -355,20 +356,20 @@ class TestAnonRecursion:
         assert 720 == r
 
     def test_abstracted_domain_code(self):
-        r = Λ(lambda π:  # d
-              Λ(lambda π:  # sf
-                π.d(Λ(lambda π: π.sf(π.sf)(π.m),
-                      ['m'], π)),
-                ['sf'], π)(  # <~~~ "squaring," i.e., self-application
-                  Λ(lambda π:  # sf
-                    π.d(Λ(lambda π: π.sf(π.sf)(π.m),
-                          ['m'], π)),
-                    ['sf'], π)),
+        r = Λ(lambda πd:  # d
+              Λ(lambda πsf:  # sf
+                πsf.d(Λ(lambda π: π.sf(π.sf)(π.m),
+                      ['m'], πsf)),
+                ['sf'], πd)(  # <~~~ "squaring," i.e., self-application
+                  Λ(lambda πsf:  # sf
+                    πsf.d(Λ(lambda π: π.sf(π.sf)(π.m),
+                          ['m'], πsf)),
+                    ['sf'], πd)),
               ['d'])(  # domain code
-            Λ(lambda π:  # f
-              Λ(lambda π:  # n -- busines code
+            Λ(lambda πf:  # f
+              Λ(lambda π:  # n -- business code
                 1 if π.n < 1 else π.n * π.f(π.n - 1),
-                ['n'], π),
+                ['n'], πf),
               ['f'])
         )(6)
         assert r == 720
@@ -418,21 +419,29 @@ class TestΥ1:
         r = ΓΠ.Υ1(ΓΠ.fact_recursive)(6)
         assert r == 720
 
-    def test_tail_recursive_factorial(self, fact_tc):
+    def test_tail_recursive_factorial_2_2(self, fact_tc):
         r = LOOP2(ΓΠ.fact_tc)(6, 1)
         assert r == ΓΠ.Υ2(ΓΠ.fact_tc)(6, 1)
+
+    def test_tail_recursive_factorial_N_2(self, fact_tc):
+        r = LOOPN(ΓΠ.fact_tc, ['μ', 'α'])(6, 1)
+        assert r == ΓΠ.Υ2(ΓΠ.fact_tc)(6, 1)
+
+    def test_tail_recursive_factorial_N_N(self, fact_tc):
+        r = LOOPN(ΓΠ.fact_tc, ['μ', 'α'])(6, 1)
+        assert r == ΓΠ.ΥN(ΓΠ.fact_tc, ['μ', 'α'])(6, 1)
 
 
 @pytest.fixture
 def fact_iter():
     # λ f: λ m, c, x: m if c > x else f(m*c, c+1, x)
-    DEFINE('fact_iter',  # domain code is a function of f ...
-           Λ(lambda π:  # ... which is business code.
+    DEFINE('fact_iter',  # Domain code is a function of f, ...
+           Λ(lambda πd:  # ... which is business code.
              Λ(lambda π:
                π.m
                if π.c > π.x
                else π.f(π.m * π.c, π.c + 1, π.x),  # business code
-               ['m', 'c', 'x'], π),  # business parameters
+               ['m', 'c', 'x'], πd),  # business parameters
              ['f']))
     yield None
     del ΓΠ.ϕ.fact_iter
@@ -532,11 +541,11 @@ def fib_fast_uncurried():
                              ['t2'], π)(π.f(π.a1, π.n_2)),  # <~~~ recurse
                            ['n_2'], π)(π.n - 2),  # dry
                          ['a1'], π)(π.m1 | {π.n_1: π.r1}),  # <~~~ update memo
-                       ['r1'], π)(π.t1[1]),  # unpac
+                       ['r1'], π)(π.t1[1]),  # unpack
                      ['m1'], π)(π.t1[0]),  # unpack
                    ['t1'], π)(π.f(π.a, π.n_1)),  # <~~~ recurse
                  ['n_1'], π)(π.n - 1),  # DRY
-               ['a', 'n'], π),  # busines parameters
+               ['a', 'n'], π),  # business parameters
              ['f']))  # domain-code signature
     yield None
     del ΓΠ.ϕ.fib_fast_uncurried
@@ -564,26 +573,32 @@ class TestTailRecursion:
         assert 720 == \
                LOOP3(ΓΠ.fact_iter)(1, 1, 6)
 
+    def test_tail_fact_iter_N(self, fact_iter):
+        assert 720 == \
+               LOOPN(ΓΠ.fact_iter, ['α', 'β', 'γ'])(1, 1, 6)
+
     def test_blown_recursion(self, fact_iter, fact_iter_0):
         with pytest.raises(RecursionError):
             ΓΠ.Υ3(ΓΠ.fact_iter)(1, 1, 400)
         with pytest.raises(RecursionError):
+            ΓΠ.ΥN(ΓΠ.fact_iter, ['α', 'β', 'γ'])(1, 1, 400)
+        with pytest.raises(RecursionError):
             ΓΠ.fact_iter_0(1, 1, 400)
 
     def test_safe_recursion(self, fact_iter):
-        assert \
-            LOOP3(ΓΠ.fact_iter)(1, 1, 400) \
-            == 64034522846623895262347970319503005850702583026002959458684445942802397169186831436278478647463264676294350575035856810848298162883517435228961988646802997937341654150838162426461942352307046244325015114448670890662773914918117331955996440709549671345290477020322434911210797593280795101545372667251627877890009349763765710326350331533965349868386831339352024373788157786791506311858702618270169819740062983025308591298346162272304558339520759611505302236086810433297255194852674432232438669948422404232599805551610635942376961399231917134063858996537970147827206606320217379472010321356624613809077942304597360699567595836096158715129913822286578579549361617654480453222007825818400848436415591229454275384803558374518022675900061399560145595206127211192918105032491008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+        assert (LOOPN(ΓΠ.fact_iter, ['α', 'β', 'γ'])(1, 1, 400) ==
+                LOOP3(ΓΠ.fact_iter)(1, 1, 400) ==
+                64034522846623895262347970319503005850702583026002959458684445942802397169186831436278478647463264676294350575035856810848298162883517435228961988646802997937341654150838162426461942352307046244325015114448670890662773914918117331955996440709549671345290477020322434911210797593280795101545372667251627877890009349763765710326350331533965349868386831339352024373788157786791506311858702618270169819740062983025308591298346162272304558339520759611505302236086810433297255194852674432232438669948422404232599805551610635942376961399231917134063858996537970147827206606320217379472010321356624613809077942304597360699567595836096158715129913822286578579549361617654480453222007825818400848436415591229454275384803558374518022675900061399560145595206127211192918105032491008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000)
 
     def test_fib_slow(self, fib_slow):
-        assert 46_368 == \
-               ΓΠ.Υ1(ΓΠ.fib_slow)(23)
-        assert 13 == \
-               ΓΠ.Υ1(ΓΠ.fib_slow)(6)
+        assert (1597 ==
+                ΓΠ.ΥN(ΓΠ.fib_slow, ['α'])(16) ==
+                ΓΠ.Υ1(ΓΠ.fib_slow)(16))
 
     def test_fib_iter(self, fib_iter):
-        assert 46_368 == \
-               LOOP3(ΓΠ.fib_iter)(0, 1, 23)
+        assert (46_368 ==
+                LOOPN(ΓΠ.fib_iter, ['α', 'β', 'γ'])(0, 1, 23) ==
+                LOOP3(ΓΠ.fib_iter)(0, 1, 23))
 
     def test_Υ2C(self, fib_fast):
         r = ΓΠ.Υ2C(ΓΠ.fib_fast)({})(23)[1]
@@ -1225,15 +1240,59 @@ class TestPatching:
                  ['m0'])(1)  # <~~~ Works with 1, also.
 
 
+@pytest.fixture
+def do_fact_tc():
+    yield Λ(lambda πo:
+            DO([('m', πo.m, Λ(lambda π: π.m - 1)),
+                ('a', 1, Λ(lambda π: π.a * π.m))],
+               pred=Λ(lambda π: π.m <= 1),
+               value=Λ(lambda π: π.a),
+               body=Λ(lambda π: None),
+               π=πo),
+            ['m'])
+
+
+@pytest.fixture
+def do_fact_ntc():
+    yield Λ(lambda πo:
+            DO_NTC([('m', πo.m, Λ(lambda π: π.m - 1)),
+                    ('a', 1, Λ(lambda π: π.a * π.m))],
+                   pred=Λ(lambda π: π.m <= 1),
+                   value=Λ(lambda π: π.a),
+                   body=Λ(lambda π: None),
+                   π=πo),
+            ['m'])
+
+
 class TestDo:
 
-    def test_do(self):
-        r = Λ(lambda πo:
-              DO([('m', 6, Λ(lambda π: π.m - 1)),
-                  ('a', 1, Λ(lambda π: π.a * π.m))],
-                 pred=Λ(lambda π: π.m <= π.m0),
-                 value=Λ(lambda π: π.a),
-                 body=Λ(lambda π: None),
-                 π=πo),
-              ['m0'])(1)
-        assert r == 720
+    def test_do_ntc(self, do_fact_ntc):
+        r = do_fact_ntc(6)
+        # Test evaluation of 'body'.
+        print()
+        r2 = DO_NTC([('m', 6, Λ(lambda π: π.m - 1)),  # <~~~ here
+                     ('a', 1, Λ(lambda π: π.a * π.m))],
+                    pred=Λ(lambda π: π.m <= 1),
+                    value=Λ(lambda π: π.a),
+                    body=Λ(lambda π:
+                           pprint({'m': π.m, 'a': π.a})))
+        assert r == r2 == 720
+
+    def test_do_tc(self, do_fact_tc):
+        r = do_fact_tc(6)
+        # Test evaluation of 'body'.
+        print()
+        r2 = DO([('m', 6, Λ(lambda π: π.m - 1)),  # <~~~ here
+                 ('a', 1, Λ(lambda π: π.a * π.m))],
+                pred=Λ(lambda π: π.m <= 1),
+                value=Λ(lambda π: π.a),
+                body=Λ(lambda π:
+                       pprint({'m': π.m, 'a': π.a})))
+        assert r == r2 == 720
+
+    def test_blown_recursion(self, do_fact_tc, do_fact_ntc):
+        big = 150
+        with pytest.raises(RecursionError):
+            r = do_fact_ntc(big)
+        r = do_fact_tc(big)
+        assert r != 1
