@@ -1,9 +1,10 @@
-from pprint import pprint, pformat
+﻿from pprint import pprint, pformat
 from typing import Any
 
 
 def ECHO(key: str, x: Any) -> Any:
     """In any Lisp, this would be a macro!"""
+    print()
     pprint({key: x})
     return x
 
@@ -28,24 +29,134 @@ class Environment:
     ϕ: "() -> None"  # "frame," a nice place to hang attributes
     π: "Environment"  # via Greek πηρι, short name for 'enclosing'
 
-    def _get_it(self, key: str) -> Any:
+    def _is_global(self):
+        return self.π is None
+
+    def _is_empty(self):
+        return not self.ϕ.__dict__
+
+    def _copy(self) -> "Environment":
+        e = Environment(lambda: None, self.π)
+        for k, v in self.ϕ.__dict__.items():
+            setattr(e.ϕ, k, v)
+        return e
+
+    def _copy_trunk(self) -> "Environment":
+        """Don't copy the global at the end, but do leave it
+        attached."""
+        if self._is_global():
+            return self
+        r = self._copy()
+        r.π = r.π._copy_trunk()  # recurse
+        return r
+
+    def _splice_onto_lower(self, lower: "Environment"):
+        """Splice self onto the end of lower._trunk(), which
+        does not have the global at its end. Self should be
+        either global or have global at its end.
+
+        For monkey-patching proc envs, where free vars and
+        parameters are looked up. 'Lower' comes from the
+        prevailing env chain when a procedure is evaluated, i.e.,
+        defined in some env like that established by LET_STAR.
+        'Lower' contains bindings for free variables in the body
+        of the procedure.
+
+        _splice_onto_lower is called iff 'self' comes from the
+        explicit π parameter of a procedure constructor. 'Self'
+        is global if the procedure has no parameters (i.e., no
+        non-free variables). An exception to this rule pertains
+        during testing, so the rule is not machine-checked.
+
+        Aside:
+        When a procedure with parameters is APPLY'd, a fresh
+        env is consed on to 'self.' The fresh env contains
+        parameter bindings. When a procedure with no parameters
+        is APPLY'd, no such env is consed on.
+
+        Definitions:
+        - A chain ends in global with no refs to globals inside.
+        - The tip of a chain is the one env furthest from global.
+        - The trunk of a chain is all but the final global.
+        - The root of a chain is the final global.
+
+        lemmas:
+        - A chain cannot be None.
+        - A chain could be simply a ref to global. That's a
+          chain with no tip or trunk, only a root.
+        - The tip of a chain is None if the chain is just the
+          final global.
+        - The trunk of a chain is None if the chain is just the
+          final global.
+
+        @precondition: self and lower are non-None chains. There
+        are two references to the global in the two chains.
+
+        @postcondition: a chain whose tip is a mutable copy of
+        the tip of lower if lower is not empty. The final global
+        of lower is replaced by self. The resulting chain has
+        one ref to global at the end (the root).
+
+        scenarios:
+        _splice_onto_lower is called iff self is an explicit
+        procedure env.
+
+        proc env is global      lower is global     return lower
+        proc env is global      lower is not empty  return lower
+        proc env is not empty   lower is global     return self
+        proc env is not empty   lower is not empty  splice
+        """
+        assert lower is not None
+        # TODO: assert lower._is_global() or not lower._is_empty()
+        if lower._is_global() or lower._is_empty():
+            return self
+        if lower is self:
+            return self
+        if self._is_global():
+            return lower
+
+        temp = self._trunk()
+        branch = temp
+        while branch.π:
+            branch = branch.π
+        branch.π = lower  # MONKEY PATCH!
+        return temp
+
+    def _trunk(self) -> "Environment":
+        """all but the last, global environment in a chain;
+        Remove the pointer to global env in a copy of the
+        penultimate. Called ONLY by _splice_onto_lower!
+        """
+        if self._is_global():
+            return None
+        else:  # Monkey-patch the last env
+            result = self._copy_trunk()
+            branch = result
+            while not branch.π._is_global():
+                branch = branch.π
+            branch.π = None  # danger! Looks global!
+            # Fix this immediately in _splice_onto_lower
+        return result
+
+    def _get_binding_val(self, var: str) -> Any:
         """Walk the sequence of Environments upward."""
         try:
-            ρ = getattr(self.ϕ, key)
+            ρ = getattr(self.ϕ, var)
         except AttributeError as _:
             if self.π is None:
-                raise NameError(f'Environment: Name {key} is unbound.')
+                raise NameError(
+                    f'Environment: Name {var} is unbound.')
             else:  # Recurse: walk upwards.
-                ρ = self.π.__getattr__(key)
+                ρ = self.π.__getattr__(var)
         return ρ
 
     def __getattr__(self, key: str) -> Any:
         """recursive lookup by dot notation"""
-        return self._get_it(key)
+        return self._get_binding_val(key)
 
     def __getitem__(self, key: str) -> Any:
         """recursive lookup by bracket notation"""
-        return self._get_it(key)
+        return self._get_binding_val(key)
 
     def __repr__(self):
         """for the debugger"""
@@ -61,24 +172,13 @@ class Environment:
         return result
 
 
-#    def __setattr__(self, key, val):
+#    def __setattr__(self, var, val):
 #        """Diverges because it calls __getattr__ for 'self.ϕ'."""
-#        setattr(getattr(self, 'ϕ'), key, val)
-#        setattr(self.ϕ, key, val)
-
-
-# diverges because it calls __getattr__ for 'self.ϕ'
-#    def __setattr__(self, key, val):
-#        setattr(getattr(self, 'ϕ'), key, val)
-#        setattr(self.ϕ, key, val)
-# The ugliness of 'setattr' is hidden in DEFINE.
+#        setattr(getattr(self, 'ϕ'), var, val)
+#        setattr(self.ϕ, var, val)
 
 
 ΓΠ = Environment(lambda: None, None)
-
-from typing import List
-
-Parameters = List[str]  # positional, ordered arguments only
 
 from typing import Dict, List, Any
 
@@ -174,56 +274,53 @@ class Var:
     sym: str
 
 
-def EVAL(expr: Any, π: Environment = ΓΠ, tag: str = None) -> Any:
-    """forward reference, corrected below"""
-    pass
-
-
-def EVAL_APPLICATION(expr: Application, π: Environment = ΓΠ) -> Any:
-    """corrected definition"""
-    if isinstance(expr.head, str):
-        head = EVAL(expr.π[expr.head], expr.π)  # 1/3. Evaluate first slot ...
-        # ... yielding a procedure, perhaps through a Var:
-        assert isinstance(head, Procedure), \
-            f'The head of {expr} must be a string or a Procedure, ' \
-            f'not a {expr.head}'
-    elif isinstance(expr.head, Procedure):
-        head = expr.head
-    else:
-        raise ValueError(
-            f'The head of {expr} must be a string or a Procedure, '
-            f'not a {expr.head}')
-    eargs = [EVAL(arg, π) for arg in expr.args]  # 2/3. Evaluate all args.
-    ρ = APPLY(head, eargs, π)  # 3.3. Apply the procedure.
-    return ρ
-
-
 from typing import Any
 import numpy
 
 
-def EVAL(expr: Any, π: Environment = ΓΠ, tag: str = None) -> Any:
+def EVAL(
+        expr: Any,
+        π: Environment = ΓΠ,
+        tag: str = None
+) -> Any:
     """forward reference, corrected below"""
     pass
 
 
-def EVAL_APPLICATION(expr: Application, π: Environment = ΓΠ) -> Any:
+def EVAL_APPLICATION(
+        expr: Application,
+        π: Environment = ΓΠ
+) -> Any:
     """corrected definition"""
     if isinstance(expr.head, str):
-        head = EVAL(expr.π[expr.head], expr.π)  # 1/3. Evaluate first slot ...
+        # 1/4. Evaluate first slot to find proc from string ...
+        proc = π[expr.head]
         # ... yielding a procedure, perhaps through a Var:
-        assert isinstance(head, Procedure), \
+        assert isinstance(proc, Procedure), \
             f'The head of {expr} must be a string or a Procedure, ' \
             f'not a {expr.head}'
     elif isinstance(expr.head, Procedure):
-        head = expr.head
+        # 1/4. Evaluate first slot in an env with free vars ...
+        proc = expr.head
     else:
         raise ValueError(
             f'The head of {expr} must be a string or a Procedure, '
             f'not a {expr.head}')
-    eargs = [EVAL(arg, π) for arg in expr.args]  # 2/3. Evaluate all args.
-    ρ = APPLY(head, eargs, π)  # 3.3. Apply the procedure.
+    # 2/4. Evaluate the proc to access free vars ...
+    proc = EVAL(proc, π)
+    # 3/4. Evaluate all args ...
+    eargs = [EVAL(arg, π) for arg in expr.args]
+    # 4/4. Apply the procedure.
+    ρ = APPLY(proc, eargs, π)  # 3.3. Apply the procedure.
     return ρ
+
+
+def EVAL_PROCEDURE(
+        λ: Procedure,
+        π: Environment = ΓΠ
+) -> Procedure:
+    λ.π = λ.π._splice_onto_lower(π)
+    return λ
 
 
 from typing import Any, Dict, Tuple, List
@@ -255,6 +352,8 @@ def EVAL(
         ρ = π[expr.sym]  # recursive lookup in Environment
     elif isinstance(expr, Application):
         ρ = EVAL_APPLICATION(expr, π)
+    elif isinstance(expr, Procedure):
+        ρ = EVAL_PROCEDURE(expr, π)
     else:
         ρ = expr
     return ρ  # hang a breakpoint here
@@ -279,14 +378,16 @@ def APPLY(
             f"which expects {len(proc.code['parameters'])} = "
             f"len({proc.code['parameters']})."
         )
-    # 1/4. Eval args in old env.
-    evaled_args = [EVAL(arg, π) for arg in args]
-    # 2/4. Make a new environment, E1.
-    E1 = Environment(lambda: None, π)
-    # 3/4. Bind parameters in new env E1 to actual args.
-    for k, v in zip(proc.code['parameters'], evaled_args):
-        setattr(E1.ϕ, k, v)
-    # 4/4. Invoke the code body, ...
+    # 1/3. Make a new environment, E1, if needed.
+    if proc.code['parameters']:
+        E1 = Environment(lambda: None, π)
+    else:
+        E1 = π
+    # 2/3. Bind parameters in new env E1 to actual args, evaled
+    #      in the old environment ...
+    for k, v in zip(proc.code['parameters'], args):
+        setattr(E1.ϕ, k, EVAL(v, π))
+    # 3/3. Invoke the code body, ...
     ρ = proc.code['body'](E1)
     # ... always a lambda of an environment π.
     return ρ
@@ -312,13 +413,6 @@ DEFINE('Υ1',
                ['sf'], π)),
          ['d']))
 
-DEFINE('fact_recursive',
-       Λ(lambda π:  # domain code; function of business code, f
-         Λ(lambda π:
-           1 if π.n < 1 else π.n * π.f(π.n - 1),  # business code
-           ['n'], π),  # 1 business parameter, n
-         ['f']))  # recursive function
-
 # λ d: (λ g: g[g])(λ sf: d[λ m, c, x: sf[sf][m, c, x]])
 DEFINE('Υ3',
        Λ(lambda π:  # of d, the domain code ...
@@ -330,16 +424,6 @@ DEFINE('Υ3',
                    ['m', 'c', 'x'], π)),  # business parameters
                ['sf'], π)),
          ['d']))
-
-# λ f: λ m, c, x: m if c > x else f(m*c, c+1, x)
-DEFINE('fact_iter',  # domain code is a function of f ...
-       Λ(lambda π:  # ... which is business code.
-         Λ(lambda π:
-           π.m
-           if π.c > π.x
-           else π.f(π.m * π.c, π.c + 1, π.x),  # business code
-           ['m', 'c', 'x'], π),  # business parameters
-         ['f']))
 
 
 class TailCall(Exception):
@@ -358,7 +442,10 @@ def RECUR(*args):
 def LOOP3(d: Procedure) -> Procedure:  # domain code
     """in sincere flattery of Clojure, and thanks to Thomas Baruchel."""
     # in the global environment, ΓΠ,
-    DEFINE('Ρ3', Λ(lambda π: RECUR(π.m, π.c, π.x), ['m', 'c', 'x']));
+    DEFINE('Ρ3',
+           Λ(lambda π:
+             RECUR(π.m, π.c, π.x),
+             ['m', 'c', 'x']))
 
     def looper(*args):
         """Expression form of a while-loop statement."""
@@ -368,22 +455,61 @@ def LOOP3(d: Procedure) -> Procedure:  # domain code
             except TailCall as e:
                 args = e.args
 
-    ρ = Λ(lambda π: looper(π.m, π.c, π.x), ['m', 'c', 'x'], π=d.π)
+    ρ = Λ(lambda π:
+          looper(π.m, π.c, π.x),
+          ['m', 'c', 'x'],
+          π=d.π)
+
     return ρ
 
 
-DEFINE('fib_slow',
-       Λ(lambda π:
-         Λ(lambda π: 1 if π.n < 2 else
-         π.f(π.n - 1) + π.f(π.n - 2), ['n'], π),
-         ['f']))
+def LOOP1(d: Procedure) -> Procedure:  # domain code
+    """in sincere flattery of Clojure, and thanks to Thomas Baruchel."""
+    # in the global environment, ΓΠ,
+    DEFINE('Ρ1',
+           Λ(lambda π:
+             RECUR(π.m),
+             ['m']))
 
-DEFINE('fib_iter',
-       Λ(lambda π:
-         Λ(lambda π: π.b if π.n < 1 else
-         π.f(π.b, π.a + π.b, π.n - 1),
-           ['a', 'b', 'n'], π),
-         ['f']))
+    def looper(*args):
+        """Expression form of a while-loop statement."""
+        while True:
+            try:
+                return d(ΓΠ.Ρ1)(*args)
+            except TailCall as e:
+                args = e.args
+
+    ρ = Λ(lambda π:
+          looper(π.m),
+          ['m'],
+          π=d.π)
+
+    return ρ
+
+
+def LOOP2(d: Procedure) -> Procedure:  # domain code
+    """in sincere flattery of Clojure, and thanks to Thomas Baruchel."""
+    # in the global environment, ΓΠ,
+    DEFINE('Ρ2',
+           Λ(lambda π:
+             RECUR(π.m, π.a),
+             ['m', 'a']))
+
+    def looper(*args):
+        """Expression form of a while-loop statement."""
+        while True:
+            try:
+                return d(ΓΠ.Ρ2)(*args)
+            except TailCall as e:
+                args = e.args
+
+    ρ = Λ(lambda π:
+          looper(π.m, π.a),
+          ['m', 'a'],
+          π=d.π)
+
+    return ρ
+
 
 DEFINE('Υ2C',
        Λ(lambda π:  # function of domain code, d ...
@@ -395,70 +521,6 @@ DEFINE('Υ2C',
                        ['n'], π), ['m'], π)),
                ['sf'], π)),
          ['d']))
-
-DEFINE('fib_fast',
-       Λ(lambda π:  # of f; level 1
-         Λ(lambda π:  # of a; level 2
-           Λ(lambda π:  # of n; level 3
-             (π.a, 1) if π.n < 2 else
-             Λ(lambda π:  # of n_1; level 4
-               (π.a, π.a[π.n_1])  # optimizer should remove these two lines
-               if π.n_1 in π.a else  # ^^^
-               Λ(lambda π:  # of fim1; level 5
-                 Λ(lambda π:  # of m1; level 6
-                   Λ(lambda π:  # of r1; level 7
-                     Λ(lambda π:  # of a1; level 8
-                       Λ(lambda π:  # of n_2; level 9
-                         (π.a1, π.r1 + π.a1[π.n_2])  # <~~~ a quick exit
-                         if π.n_2 in π.a1 else
-                         Λ(lambda π:  # of fim2; level 10
-                           Λ(lambda π:  # of m2; level 11
-                             Λ(lambda π:  # of r2; level 12
-                               Λ(lambda π:  # of a2; level 13
-                                 (π.a2, π.r1 + π.r2),  # <~~~ the money line
-                                 ['a2'], π)(π.m2[0] | {π.n_2: π.r2}),  # <~~~ update memo
-                               ['r2'], π)(π.m2[1]),  # unpack
-                             ['m2'], π)(π.fim2(π.n_2)),  # unpack
-                           ['fim2'], π)(π.f(π.a1)),  # <~~~ recurse
-                         ['n_2'], π)(π.n - 2),  # DRY
-                       ['a1'], π)(π.m1[0] | {π.n_1: π.r1}),  # <~~~ update memo
-                     ['r1'], π)(π.m1[1]),  # unpack
-                   ['m1'], π)(π.fim1(π.n_1)),  # unpack
-                 ['fim1'], π)(π.f(π.a)),  # <~~~ recurse
-               ['n_1'], π)(π.n - 1),  # DRY
-             ['n'], π),  # business parameter
-           ['a'], π),  # curried memo
-         ['f']))  # domain code
-
-DEFINE('fib_fast_uncurried',
-       Λ(lambda π:  # of f; level 1
-         Λ(lambda π:  # of a, n; level 2
-           (π.a, 1) if π.n < 2 else
-           Λ(lambda π:  # of n_1; level 3
-             Λ(lambda π:  # of t1; level 4
-               Λ(lambda π:  # of m1; level 5
-                 Λ(lambda π:  # of r1; level 6
-                   Λ(lambda π:  # of a1; level 7
-                     Λ(lambda π:  # of n_2; level 8
-                       (π.a1, π.r1 + π.a1[π.n_2])  # <~~~ quick exit
-                       if π.n_2 in π.a1 else
-                       Λ(lambda π:  # of t_2; level 9
-                         Λ(lambda π:  # of m_2; level 10
-                           Λ(lambda π:  # of r_2; level 11
-                             Λ(lambda π:  # of a_2; level 12
-                               (π.a2, π.r1 + π.r2),  # <~~~ the money line
-                               ['a2'], π)(π.m2 | {π.n_2: π.r2}),  # <~~~ update memo
-                             ['r2'], π)(π.t2[1]),  # nupaci
-                           ['m2'], π)(π.t2[0]),  # unpack
-                         ['t2'], π)(π.f(π.a1, π.n_2)),  # <~~~ recurse
-                       ['n_2'], π)(π.n - 2),  # dry
-                     ['a1'], π)(π.m1 | {π.n_1: π.r1}),  # <~~~ update memo
-                   ['r1'], π)(π.t1[1]),  # unpac
-                 ['m1'], π)(π.t1[0]),  # unpack
-               ['t1'], π)(π.f(π.a, π.n_1)),  # <~~~ recurse
-             ['n_1'], π)(π.n - 1),  # DRY
-           ['a', 'n'], π),  # busines parameters
-         ['f']))  # domain-code signature
 
 DEFINE('Υ2',
        Λ(lambda π:  # of d, the domain code ...
@@ -480,23 +542,13 @@ DEFINE('Υ5',
                ['sf'], π)),
          ['d']))
 
-DEFINE('fib_tc_memo',
-       Λ(lambda π:
-         Λ(lambda π:
-           (π.a | {π.x: π.r2}, π.r2) if π.n < 1 else \
-               π.f(π.r2, π.r1 + π.r2,
-                   π.a | {π.x - π.n: π.r2},
-                   π.n - 1,
-                   π.x),
-           ['r1', 'r2', 'a', 'n', 'x'], π),
-         ['f']))
-
 
 def LOOP5(d: Procedure) -> Procedure:
     """in sincere flattery of Clojure, and thanks to Thomas Baruchel."""
-    DEFINE('Ρ5', Λ(lambda π:
-                   RECUR(π.m, π.c, π.x, π.a, π.b),
-                   ['m', 'c', 'x', 'a', 'b']));
+    DEFINE('Ρ5',
+           Λ(lambda π:
+             RECUR(π.m, π.c, π.x, π.a, π.b),
+             ['m', 'c', 'x', 'a', 'b']))
 
     def looper(*args):
         """Expression form of a while-loop statement."""
@@ -508,7 +560,9 @@ def LOOP5(d: Procedure) -> Procedure:
 
     ρ = Λ(lambda π:
           looper(π.m, π.c, π.x, π.a, π.b),
-          ['m', 'c', 'x', 'a', 'b'], π=d.π)
+          ['m', 'c', 'x', 'a', 'b'],
+          π=d.π)
+
     return ρ
 
 
@@ -547,90 +601,53 @@ BEGIN = BLOCK
 
 
 def LET_STAR(
-        binding_pairs: List[Tuple[str, Application]],
-        body: Application,
-        π: Environment = ΓΠ
+        binding_pairs: List[Tuple[str, Any]],
+        body: Union[Application, Procedure],
+        πl: Environment = ΓΠ
 ) -> Any:
     if len(binding_pairs) == 0:  # <~~~ Empty bindings are allowed.
-        ρ = EVAL(body, π)
+        ρ = EVAL(body, πl)
         return ρ
     key, val = binding_pairs[0]
+    E1 = Environment(lambda: None, πl)
+    setattr(E1.ϕ, key, EVAL(val, πl))
     if len(binding_pairs) == 1:
-        νλ = Λ(lambda π:
-               EVAL(body, π),
-               [key], π=π)
+        return EVAL(body, E1)
     else:
-        νλ = Λ(lambda π:  # <~~~ Sequence is realized by recursion.
-               LET_STAR(binding_pairs[1:], body, π),
-               [key], π=π)  # <~~~ Automatically chains envs.
-    ρ = νλ(EVAL(val, π))
-    return ρ
+        return LET_STAR(binding_pairs[1:], body, E1)
 
 
 def LET(
-        binding_pairs: List[Tuple[str, Any]],
+        pairs: List[Tuple[str, Any]],
         body: Application,
         π: Environment = ΓΠ
 ) -> Any:
-    if len(binding_pairs) == 0:
+    if len(pairs) == 0:
         ρ = EVAL(body, π)
         return ρ
-    keys = [pair[0] for pair in binding_pairs]
-    vals = [pair[1] for pair in binding_pairs]
-    νλ = Λ(lambda π:
-           EVAL(body, π),
-           keys,
-           π=π)
-    ρ = APPLY(νλ, vals, π=π)  # <~~~ Makes a new env for νλ.
+    E1 = Environment(lambda: None, π)
+    for p in pairs:
+        if isinstance(p[1], Procedure):
+            p[1].π = E1
+    _ = [setattr(E1.ϕ, p[0], EVAL(p[1], π))
+         for p in pairs]
+    ρ = EVAL(body, E1)
     return ρ
 
 
-def _make_parented_env(
-        pairs: List[Tuple[str, Any]],
-        parent: Environment
-) -> Environment:
-    result = Environment(lambda: None, parent)
-    _ = [setattr(result.ϕ, pair_[0], pair_[1])
-         for pair_ in pairs]
-    return result
-
-
-def _is_empty(π: Environment) -> bool:
-    result = (not π.__dict__)
-    return result
-
-
-def _patched_env(
-        parent: Environment,
-        pairs: List[Tuple[str, Any]],
-        e: Environment
-) -> Environment:
-    result = (e if _is_empty(parent)
-              else _make_parented_env(pairs, e))
-    return result
-
-
-def _monkey_patch_env(
-        obj: Any,
-        pairs: List[Tuple[str, Any]],
-        e: Environment
-) -> None:
-    if isinstance(obj, Procedure):
-        obj.π = _patched_env(obj.π, pairs, e)
-
-
 def LETREC(
-        binding_pairs: List[Tuple[str, Any]],
-        body: Application,
+        pairs: List[Tuple[str, Any]],
+        body: Union[Application, Procedure],
         π: Environment = ΓΠ
 ) -> Any:
-    if len(binding_pairs) == 0:
+    if len(pairs) == 0:
         ρ = EVAL(body, π)
         return ρ
-    E1 = _make_parented_env(binding_pairs, π)
-    for pair in binding_pairs:
-        _monkey_patch_env(pair[1], binding_pairs, E1)
-    _monkey_patch_env(body, binding_pairs, E1)
+    E1 = Environment(lambda: None, π)
+    for p in pairs:
+        if isinstance(p[1], Procedure):
+            p[1].π = E1
+    _ = [setattr(E1.ϕ, p[0], p[1]) for p in pairs]
     ρ = EVAL(body, E1)
     return ρ
 
@@ -649,4 +666,81 @@ def LABELS(
     return result  # <~~~ Hang breakpoint here.
 
 
-def
+def CHECK_TYPE(x: Any, t: Any) -> Any:
+    assert isinstance(x, t)
+    return x
+
+
+def DO(
+        triples: List[Tuple[str, Any, Procedure]],
+        pred: Procedure,
+        value: Any,
+        body: Procedure,
+        π: Environment = ΓΠ):
+    """(DO ((<var1> <init1> <λstep1>)
+            (<var2> <init2> <λstep2>
+            . . .
+            (<varñ> <initñ> <λstepñ))
+            (<λpred> <value>)
+            <ξbody>
+            <env=None>).
+    The <init>s and <step>s are evaluated in parallel, as with
+    Scheme "let". They may refer to any variables in the env.
+    See "dofact" for an example. """
+    vars = [CHECK_TYPE(t[0], str) for t in triples]
+    inits = [t[1] for t in triples]
+    steps = [CHECK_TYPE(t[2], Procedure) for t in triples]
+    E1 = Environment(lambda: None, π)
+    _ = [setattr(E1.ϕ, f'σteps_{i}', step)
+         for i, step in enumerate(steps)]
+    setattr(E1.ϕ, 'πred', CHECK_TYPE(pred, Procedure))
+    setattr(E1.ϕ, 'vaλue', CHECK_TYPE(value, Procedure))
+    setattr(E1.ϕ, 'βody', CHECK_TYPE(body, Procedure))
+    r = LABELS([(
+        'λoop',
+        # Can't execute βody without BLOCK1 :)
+        BLOCK(
+            Λ(lambda π:
+              Λ(lambda π:
+                (EVAL(Ξ('vaλue'), π)
+                 if EVAL(Ξ('πred'), π)
+                 else π.λoop(
+                    *[EVAL(Ξ(f'σteps_{i}'), π)
+                      for i in range(len(steps))])),
+                vars)
+              ), π=π)
+    )],
+        Ξ('λoop',
+          [EVAL(init, E1) for init in inits],
+          E1),
+        E1)
+    return r
+
+# BLOCK(
+#     Λ(lambda π: print()),
+#     Λ(lambda π: [pprint({f'step[{i}]': step}) for i, step in enumerate(steps)]),
+#     Λ(lambda π: pprint({'pred': pred})),
+#     Λ(lambda π: pprint({'value': value})),
+#     Λ(lambda π: pprint({'body': body})),
+#     Λ(lambda π: pprint({'m': E1.m, 'a': E1.a})),
+#     Λ(lambda π:
+#       (Ξ(value, π=E1)
+#        if Ξ(pred, π=E1)
+#        else
+#        Ξ(Λ(lambda π:
+#            π.loop(*[Ξ(step, π=E1) for step in steps])),
+#          π=E1)),
+#       vars,
+#       E1)(E1.m, E1.a),
+#     π=E1
+# )
+
+# Λ(lambda π:
+#   (Ξ(value, π=E1)
+#    if Ξ(pred, π=E1)
+#    else
+#    Ξ(Λ(lambda π:
+#        π.loop(*[Ξ(step, π=E1) for step in steps])),
+#      π=E1)),
+#   vars,
+#   E1)(E1.m, E1.a)
