@@ -282,34 +282,34 @@ class TestFirstClassness:
         assert r == 1764
 
     def test_anon_sibling(self):
-        r = Λ(lambda π:  # Create environment E1 in ΓΠ.
-              Λ(lambda π:  # Create environment E2 in ΓΠ.
-                π.n * π.n,  # <~~~ n is bound in E2.
+        r = Λ(lambda E1:  # Create environment E1 in ΓΠ.
+              Λ(lambda E2:  # Create environment E2 in ΓΠ.
+                E2.n * E2.n,  # <~~~ n is bound in E2.
                 ['n']  # (E2 is sibling to E1)
                 )  # Parent environment implicitly ΓΠ.
-              (π.m),  # <~~~ Look up m in E1, bind to n in E2.
+              (E1.m),  # <~~~ Look up m in E1, bind to n in E2.
               ['m'])(42)  # <~~~ Bind m to 42 in E1.
         assert r == 1764
 
-    def test_non_shadowing(self):
-        r = Λ(lambda π:  # Create environment E1 in ΓΠ.
-              Λ(lambda π:  # Create environment E2 in ΓΠ.
-                π.n * π.n,  # <~~~ n is bound in E2.
+    def test_shadowing(self):
+        r = Λ(lambda E1:  # Create environment E1 in ΓΠ.
+              Λ(lambda E2:  # Create environment E2 in ΓΠ.
+                E2.n * E2.n,  # <~~~ n is bound in E2.
                 ['n']  # (E2 is sibling to E1)
                 )  # Parent environment implicitly ΓΠ.
               # DIFFERENT ............................
-              (π.n),  # <~~~ Look up n in E1, bind to n in E2.
+              (E1.n),  # <~~~ Look up n in E1, bind to n in E2.
               ['n'])(42)  # <~~~ a different n bound to 42 in E1.
         assert r == 1764
 
     def test_anon_child(self):
-        r = Λ(lambda π:  # Create environment E1 in ΓΠ.
-              Λ(lambda π:  # Create environment E2 in E1 !!!!
-                π.x * π.n,  # <~~~ n in E1, x in E2.
-                ['x'],  # (E2 is child of E1, written E1<--E2)
-                π)  # Parent environment *explicitly* E1.
-              (π.n),  # <~~~ Look up n in E1, bind x in E1<--E2
-              ['n'])(42)  # <~~~ Bind n to 42 in E1
+        r = Λ(lambda E1:  # Calling it creates environment E1 in ΓΠ.
+              Λ(lambda E2:  # !!!! Define in E1 !!!!
+                E2.n * E2.m,  # <~~~ n in E1, x in E2.
+                ['n'],  # (E2 is child of E1, written E1<--E2)
+                E1)(  # !!!! Parent environment *explicitly* E1 !!!!
+                  E1.m),  # <~~~ Look up n in E1, bind x in E2->E1
+              ['m'])(42)  # <~~~ Bind n to 42 in E1
         assert r == 1764
 
     def test_returned_proc(self, square):
@@ -320,6 +320,53 @@ class TestFirstClassness:
             ΓΠ.square)(
             42)  # Apply the returned procedure.
         assert r == 1764
+
+    def test_returned_static_closure(self):
+        foo = Λ(lambda E1:
+                Λ(lambda E2:
+                  E2.n * ECHO('E2', E2).m,
+                  ['n'],
+                  E1)  # <~~~ defined in E1
+                (E1.m),
+                ['m'])
+        assert 1764 == foo(42)
+
+    def test_returned_dynamic_closure(self):
+        bar = Λ(lambda E1:
+                EVAL(
+                    Λ(lambda E2:
+                      E2.n * ECHO('E2', E2).m,
+                      ['n']
+                      ),  # <~~~ defined in global
+                    E1)  # <~~~ evaluated in E1; envrt patched
+                (E1.m),
+                ['m'])
+        assert 1764 == bar(42)
+
+    def test_redundantly_patched_dynamic_closure(self):
+        r = Λ(lambda E1:
+              EVAL(  # EVAL the inner procedure itself ....
+                  Λ(lambda E2:
+                    E2.n * ECHO('E2', E2).m,  # <~~~ n and m are bound in E2;
+                    ['n'], E1  # !!!! explicitly defined in outer E1
+                    ), E1)  # .... in the outer environment E1.
+              (E1.m),  # <~~~ Look up m in E1, bind to n in E2.
+              ['m'])
+        assert 1764 == r(42)  # <~~~ Bind m to 42 in E1.
+
+    def test_currying(self):
+
+        r = Λ(lambda πo:
+              Λ(lambda πi: πi.x + πi.y ** 2,
+                ['y'],
+                πo),  # <~~~ explicit chaining
+              ['x'])(43)(42)
+
+        q = Λ(lambda π: π.x + π.y**2,
+              ['x', 'y'])(
+            43, 42)
+
+        assert r == q
 
 
 class TestAnonRecursion:
@@ -359,11 +406,11 @@ class TestAnonRecursion:
         r = Λ(lambda πd:  # d
               Λ(lambda πsf:  # sf
                 πsf.d(Λ(lambda π: π.sf(π.sf)(π.m),
-                      ['m'], πsf)),
+                        ['m'], πsf)),
                 ['sf'], πd)(  # <~~~ "squaring," i.e., self-application
                   Λ(lambda πsf:  # sf
                     πsf.d(Λ(lambda π: π.sf(π.sf)(π.m),
-                          ['m'], πsf)),
+                            ['m'], πsf)),
                     ['sf'], πd)),
               ['d'])(  # domain code
             Λ(lambda πf:  # f

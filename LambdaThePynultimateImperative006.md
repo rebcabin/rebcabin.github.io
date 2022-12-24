@@ -5,14 +5,14 @@ jupytext:
     extension: .md
     format_name: myst
     format_version: 0.13
-    jupytext_version: 1.14.1
+    jupytext_version: 1.14.4
 kernelspec:
   display_name: Python 3 (ipykernel)
   language: python
   name: python3
 ---
 
-# Lambda, the Pynultimate Imperative
+### Lambda, the Pynultimate Imperative
 
 +++
 
@@ -83,7 +83,7 @@ Contrast to a braided design, where each facility explicitly accounts for every 
 
 +++
 
-The goal of this notebook is to transmit ideas from my mind into yours. I want you to read the code. Most of the examples return easy numerical results like `42 * 43 == 1806`. I want you to do the arithmetic and check the result by looking at them. That's why I don't use Python `assert`, here. 
+The goal of this notebook is to transmit ideas from my mind into yours. I want you to read the code. Most of the examples return easy numerical results like `42 * 43 == 1806`. I want you to do the arithmetic and check the result by looking at them. That's why I don't use Python `assert`, here.
 
 +++
 
@@ -151,7 +151,7 @@ $\pi$ for an enclosing environment is a nice pun: it evokes $\pi\eta\rho\iota$, 
 
 +++
 
-We use Greek letters for system attributes and variables that will be impossible for users to write if the follow the rule below. So, for example, we don't need `gensym`, a thorn in every Lisp programmer's side. 
+We use Greek letters for system attributes and variables that will be impossible for users to write if the follow the rule below. So, for example, we don't need `gensym`, a thorn in every Lisp programmer's side.
 
 +++
 
@@ -183,7 +183,7 @@ If the definitions above are acceptable, the apparent contradiction in SICP is r
 
 +++
 
-> __OBSERVATION__: A frame $\phi$ belongs to a virtual sequence of environments implied by the unidirectional chain of enclosing environments ending at the unique global environment. 
+> __OBSERVATION__: A frame $\phi$ belongs to a virtual sequence of environments implied by the unidirectional chain of enclosing environments ending at the unique global environment.
 
 +++
 
@@ -195,7 +195,7 @@ In the Environment class, we override `__getattr__` to avoid a separate method f
 
 +++
 
-The `Environment` class is lengthy due to splicing code, necessary to give bindings to [___free variables___](#free-variables) in procedure bodies. Jupyter notebooks do not furnish a convenient way to break up the code for classes, so we have put essential information in comments in this code. Read the comments as if they were text in the document. 
+The `Environment` class is lengthy due to splicing code, necessary to give bindings to [___free variables___](#free-variables) in procedure bodies. Jupyter notebooks do not furnish a convenient way to break up the code for classes, so we have put essential information in comments in this code. Read the comments as if they were text in the document.
 
 ```{code-cell} ipython3
 from dataclasses import dataclass, field
@@ -680,7 +680,7 @@ Do not confuse this _Application_, with a capital "A", with the word _applicatio
 
 +++
 
-`Application` is a placeholder for a more general [QUOTE](#quote) mechanism, which prevents evaluation in all cases (TODO). In real Scheme, `LET` and friends are syntactical forms that delay evaluation via Scheme macros, code rewriters. We prefer explicit delaying via `Application` objects at the semantical level, for clarity. An alternative is an embedded macro DSL (Domain-Specific Language) in Python, overkill here. If we go down that road, we might as well just implement Scheme altogether (TODO: reconsider). 
+`Application` is a placeholder for a more general [QUOTE](#quote) mechanism, which prevents evaluation in all cases (TODO). In real Scheme, `LET` and friends are syntactical forms that delay evaluation via Scheme macros, code rewriters. We prefer explicit delaying via `Application` objects at the semantical level, for clarity. An alternative is an embedded macro DSL (Domain-Specific Language) in Python, overkill here. If we go down that road, we might as well just implement Scheme altogether (TODO: reconsider).
 
 +++
 
@@ -751,7 +751,7 @@ class Var:
 
 +++
 
-`EVAL` calls `APPLY` for applications. But `APPLY` calls `EVAL` on all arguments. To define `EVAL` and `APPLY`, we employ the earlier forward reference for `APPLY`. We test `EVAL` after [`APPLY` is corrected, below](#apply). 
+`EVAL` calls `APPLY` for applications. But `APPLY` calls `EVAL` on all arguments. To define `EVAL` and `APPLY`, we employ the earlier forward reference for `APPLY`. We test `EVAL` after [`APPLY` is corrected, below](#apply).
 
 +++
 
@@ -1150,7 +1150,7 @@ DEFINE('fact_iter',
 
 +++
 
-Here is a procedure of `f` and `x` that applies `f` to `x`:
+Here is a procedure of `f` and `x` that applies `f` to `x`. Bind `f` to `square`, `x` to 42, then invoke `f`.
 
 ```{code-cell} ipython3
 # Outer parens necessary to break lines for comments (Python syntax booger).
@@ -1164,19 +1164,19 @@ Here is a procedure of `f` and `x` that applies `f` to `x`:
 
 +++
 
-Here is a procedure that applies an internal procedure. The outer `m` is in environment `E1` rooted in $\Gamma\Pi$. 
+Here is a procedure that applies an internal procedure of `n` in `E2`. The outer procedure of `m` in `E1` is rooted in $\Gamma\Pi$.
 
 ```{code-cell} ipython3
 Λ(lambda E1:      # Calling it creates environment E1 in ΓΠ.
   Λ(lambda E2:    # Calling it creates environment E2 in ΓΠ.
     E2.n * E2.n,  # <~~~ n is bound in E2;
     ['n']         #      E2 is sibling to E1.
-   )              # Parent environment implicitly ΓΠ.
-  (E1.m),         # <~~~ Look up m in E1, bind to n in E2.
+   )(             # Parent environment implicitly ΓΠ.
+      E1.m)       # <~~~ invocation; Look up m in E1, bind to n in E2.
   ['m'])(42)      # <~~~ Bind m to 42 in E1.
 ```
 
-The inner environment, `E2` is not explicitly chained to `E1`, so `m`, a [free variable](#free-variable) in the inner $\lambda$, is not found in `E2`. We show several ways to find `m` immediately below.
+The inner environment, `E2` is not explicitly chained to `E1`, so `m`, a [free variable](#free-variable) in the inner $\lambda$, is not found in `E2`.
 
 ```{code-cell} ipython3
 try:
@@ -1184,44 +1184,91 @@ try:
       Λ(lambda E2:    # Calling it creates environment E2 in ΓΠ.
         E2.n * ECHO('E2', E2).m,  # <~~~ n is bound in E2; m is not bound in E2.
         ['n']         #      E2 is sibling to E1.
-       )              # Parent environment implicitly ΓΠ.
-      (E1.m),         # <~~~ Look up m in E1, bind to n in E2.
+       )(             # Parent environment implicitly ΓΠ.
+          E1.m),      # <~~~ invocation. Look up m in E1, bind to n in E2.
       ['m'])(42)      # <~~~ Bind m to 42 in E1.
 except NameError as e:
     print(e.args)
 ```
 
-To chain the environments, we can simply _define_ the inner procedure of `E2` in the outer environment, `E1`:
+That's not the default behavior in Scheme. For instance, Gambit Scheme reports
+
+```{raw-cell}
+((lambda (m) 
+   (lambda (n) (* n m)
+   ) 
+   m) 
+  42) 
+```
+
+Scheme _automatically_ chains environments at procedure-define-time. Scheme `define` does not have environment parameters. Schemulator does; we can explicitly specify an environment in a procedure definition.
 
 ```{code-cell} ipython3
 Λ(lambda E1:      # Calling it creates environment E1 in ΓΠ.
   Λ(lambda E2:    # !!!! Define in E1 !!!!
     E2.n * E2.m,  # <~~~ n in E1, x in E2.
     ['n'],        #      (E2 is child of E1, written E1<--E2)
-    E1)           # !!!! Parent environment *explicitly* E1 !!!!
-  (E1.m),         # <~~~ Look up n in E1, bind x in E2->E1
+    E1)(          # !!!! Parent environment *explicitly* E1 !!!!
+         E1.m),   # <~~~ Look up n in E1, bind x in E2->E1
   ['m'])(42)      # <~~~ Bind n to 42 in E1
 ```
 
-Or, we can explicitly `EVAL` the inner procedure of `E2` in the environment `E1` of the outer procedure:
+### Static Closure
+
++++
+
+That's how to create [closures](#closures) at define-time. When invoked, the following version of the procedure prints out the inner environment, and we can see the environment chain; the inner contains `n`, the next contains `m`, the final is the global:
 
 ```{code-cell} ipython3
-Λ(lambda E1:        
-  EVAL(               # EVAL the inner procedure itself ....
-      Λ(lambda E2:  
-        E2.n * ECHO('E2', E2).m,  # <~~~ n and m are bound in E2;
-        ['n']         # !!!! implicitly defined in global ΓΠ
-       ), E1)         # .... in the outer environment E1.
-  (E1.m),             # <~~~ Look up m in E1, bind to n in E2.
-  ['m'])(42)          # <~~~ Bind m to 42 in E1.
+foo = Λ(lambda E1:
+        Λ(lambda E2:
+          E2.n * ECHO('E2', E2).m,
+          ['n'],
+          E1)  # <~~~ defined in E1
+        (E1.m),
+        ['m'])
+foo(42)
 ```
 
+### Dynamic Closure
+
++++
+
+If we explicitly `EVAL` the inner procedure of `E2` in the environment `E1` of the outer procedure, the evaluator dynamically splices the environments. The downside of this approach is that the splicing is done on every invocation of the outer procedure. The upside is that it lets us create closures at run time from unclosed or partially closed procedures:
+
+```{code-cell} ipython3
+bar = Λ(lambda E1:
+        EVAL(
+            Λ(lambda E2:
+              E2.n * ECHO('E2', E2).m,
+              ['n']
+             ),  # <~~~ defined in global
+            E1)  # <~~~ evaluated in E1; envrt patched
+        (E1.m),
+        ['m'])
+bar(42)
+```
+
+Gambit Scheme does not support re-defining environments at run time.
+
+```{raw-cell}
+> (define foo (lambda n (* n m)))
+*** WARNING -- defining global variable: foo
+1> 
+> foo
+#<procedure #5 foo>
+> ((lambda (m) (foo 42)) 43)
+*** ERROR IN foo, (console)@8.28 -- Unbound variable: m
+```
+
+If we do both, defining _and_ evaluating the inner $\lambda$ in E1, we get only one copy of E1 containing `m` because the dynamic splicing code in [`Environment`](#environment) checks this case:
+
 ```{code-cell} ipython3
 Λ(lambda E1:        
   EVAL(               # EVAL the inner procedure itself ....
       Λ(lambda E2:  
         E2.n * ECHO('E2', E2).m,  # <~~~ n and m are bound in E2;
-        ['n'], E1         # !!!! implicitly defined in global ΓΠ
+        ['n'], E1         # !!!! explicitly defined in outer E1
        ), E1)         # .... in the outer environment E1.
   (E1.m),             # <~~~ Look up m in E1, bind to n in E2.
   ['m'])(42)          # <~~~ Bind m to 42 in E1.
@@ -1231,7 +1278,7 @@ Or, we can explicitly `EVAL` the inner procedure of `E2` in the environment `E1`
 
 +++
 
-Because the two variables `m` and `n` are in differnet environments, they can have the same name. The inner `n` ___shadows___ the outer `n` is inaccessible. 
+Because the two variables `m` and `n` are in differnet environments, they can have the same name. The inner `n` ___shadows___ the outer `n` is inaccessible.
 
 ```{code-cell} ipython3
 Λ(lambda π:     # Calling it creates environment E1 in ΓΠ.
@@ -1282,7 +1329,7 @@ Return a fresh anonymous procedure rather than one bound to a global symbol as a
 
 +++
 
-> A ___1-thunk___ is a procedure of one argument. 1-thunks are the only kind of lambda expressions in the lambda calculus. In the lambda calculus, all 1-thunks are functions, with no side-effects.
+> A ___1-thunk___ is a procedure of one argument. 1-thunks are the only kind of lambda expressions in the lambda calculus. In the lambda calculus, all lambda expressions are functions, with no side-effects.
 
 +++
 
@@ -1290,16 +1337,30 @@ Return a fresh anonymous procedure rather than one bound to a global symbol as a
 
 +++
 
-For edample, in ordinary Python, the following function of two arguments:
+For example, in ordinary Python, the following $\lambda$ of `x` and `y`:
 
 ```{code-cell} ipython3
 (lambda x, y: x + y**2)(43, 42)
 ```
 
-is curried into the following:
+is curried into the following: a $\lambda$ of `x` returning a $\lambda$ of `y`:
 
 ```{code-cell} ipython3
 (lambda x: (lambda y: x + y**2))(43)(42)
+```
+
+Here are these examples in Schemulator.
+
+```{code-cell} ipython3
+Λ(lambda π: π.x + π.y**2, ['x', 'y'])(43, 42)
+```
+
+```{code-cell} ipython3
+Λ(lambda πo: 
+  Λ(lambda πi: πi.x + πi.y**2, 
+    ['y'], 
+    πo),  # <~~~ explicit chaining
+  ['x'])(43)(42)
 ```
 
 Notice that `x` occurs [free](#free-variables) in the inner lambda, but [bound](#bound-variables) in the body of the un-curriend lambda. As always, be wary of [the confusing terminology "bound variable"](#confusing). Also notice that the curried form requires two invocations, one for each formal parameter of the two 1-thunks.
@@ -1310,7 +1371,15 @@ The name "curried" comes from Haskell Curry, who developed the theory of analyzi
 
 +++
 
-In many of the examples below, we will work with curried functions.
+In many examples below, we will work with curried functions.
+
++++
+
+# Partial Evaluation and Automatic Currying
+
++++
+
+TODO
 
 +++
 
