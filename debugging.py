@@ -224,7 +224,7 @@ class Procedure:
 def Λ(body: "(π: Any) -> Any",
       parameters=None,  # default empty
       π=ΓΠ  # default global
-      ) -> Procedure:
+) -> Procedure:
     ρ = Procedure(
         code={"body": body,
               "parameters": parameters or []},
