@@ -275,11 +275,21 @@ class TestFirstClassness:
 
     def test_procs_as_args(self, square):
         # Outer parens necessary to break lines for comments (Python syntax booger).
-        r = (Λ(lambda π:  # Create environment E1 in ΓΠ
-               π.f(π.x),  # Apply E1.f to E1.x.
+        r = (Λ(lambda E1:  # Create environment E1 in ΓΠ
+               E1.f(E1.x),  # Apply E1.f to E1.x.
                ['f', 'x'])  # parameters
              (ΓΠ.square, 42))  # <~~~ Bind f to square, x to 42.
         assert r == 1764
+
+    def test_no_implicit_chaining(self):
+        with pytest.raises(NameError):
+            Λ(lambda E1:  # Calling this λ chains environment E1 to ΓΠ.
+              Λ(lambda E2:  # Calling this λ chains environment E2 to ΓΠ.
+                E2.n * ECHO('E2', E2).m,  # <~~~ n is bound in E2; m is not bound in E2.
+                ['n']  # E2 is sibling to E1.
+                )(  # Parent environment implicitly ΓΠ.
+                  E1.m),  # <~~~ invocation. Look up m in E1, bind to n in E2.
+              ['m'])(42)  # <~~~ Bind m to 42 in E1.
 
     def test_anon_sibling(self):
         r = Λ(lambda E1:  # Create environment E1 in ΓΠ.
@@ -324,7 +334,7 @@ class TestFirstClassness:
     def test_returned_static_closure(self):
         foo = Λ(lambda E1:
                 Λ(lambda E2:
-                  E2.n * ECHO('E2', E2).m,
+                  E2.n * E2.m,
                   ['n'],
                   E1)  # <~~~ defined in E1
                 (E1.m),
@@ -335,7 +345,7 @@ class TestFirstClassness:
         bar = Λ(lambda E1:
                 EVAL(
                     Λ(lambda E2:
-                      E2.n * ECHO('E2', E2).m,
+                      E2.n * E2.m,
                       ['n']
                       ),  # <~~~ defined in global
                     E1)  # <~~~ evaluated in E1; envrt patched
@@ -347,7 +357,7 @@ class TestFirstClassness:
         r = Λ(lambda E1:
               EVAL(  # EVAL the inner procedure itself ....
                   Λ(lambda E2:
-                    E2.n * ECHO('E2', E2).m,  # <~~~ n and m are bound in E2;
+                    E2.n * E2.m,  # <~~~ n and m are bound in E2;
                     ['n'], E1  # !!!! explicitly defined in outer E1
                     ), E1)  # .... in the outer environment E1.
               (E1.m),  # <~~~ Look up m in E1, bind to n in E2.
@@ -355,14 +365,13 @@ class TestFirstClassness:
         assert 1764 == r(42)  # <~~~ Bind m to 42 in E1.
 
     def test_currying(self):
-
         r = Λ(lambda πo:
               Λ(lambda πi: πi.x + πi.y ** 2,
                 ['y'],
                 πo),  # <~~~ explicit chaining
               ['x'])(43)(42)
 
-        q = Λ(lambda π: π.x + π.y**2,
+        q = Λ(lambda π: π.x + π.y ** 2,
               ['x', 'y'])(
             43, 42)
 
@@ -372,66 +381,76 @@ class TestFirstClassness:
 class TestAnonRecursion:
 
     def test_square_of_function(self):
-        r = Λ(lambda π:
-              Λ(lambda π:
+        r = Λ(lambda πsf:  # <~~~ Apply this Λ ...
+              Λ(lambda πn:
                 # Observe the "multiplication" sf(sf):
-                1 if π.n < 1 else π.n * π.sf(π.sf)(π.n - 1),
-                ['n'], π), ['sf'])(  # <~~~ apply to copy of itself
-            Λ(lambda π:  # <~~~ this gets bound to 'sf'
-              Λ(lambda π:
-                1 if π.n < 1 else π.n * π.sf(π.sf)(π.n - 1),
-                ['n'], π), ['sf']))(6)
+                1 if πn.n < 1 else πn.n * πn.sf(πn.sf)(πn.n - 1),
+                ['n'], πsf),
+              ['sf'])(  # <~~~ ... to a copy of itself.
+            Λ(lambda πsf:  # <~~~ bind this Λ to upper 'sf'
+              Λ(lambda πn:
+                1 if πn.n < 1 else πn.n * πn.sf(πn.sf)(πn.n - 1),
+                ['n'], πsf),
+              ['sf']))(6)
         assert r == 720
 
     def test_delayed_square(self):
-        r = Λ(lambda π:  # sf
-              Λ(lambda π:  # f
-                Λ(lambda π:  # n
-                  1 if π.n < 1 else π.n * π.f(π.n - 1),
-                  ['n'], π),
-                ['f'], π)(Λ(lambda π:  # m
-                            π.sf(π.sf)(π.m), ['m'], π)),
-              ['sf'])(  # <~~~ apply to copy of self
-            Λ(lambda π:  # sf
-              Λ(lambda π:  # f
-                Λ(lambda π:  # n
-                  1 if π.n < 1 else π.n * π.f(π.n - 1),
-                  ['n'], π),
-                ['f'], π)(Λ(lambda π:  # m
-                            π.sf(π.sf)(π.m), ['m'], π)),
+        r = Λ(lambda πsf:
+              Λ(lambda πf:  # Domain code d is a function of business code f.
+                Λ(lambda πn:  # Business code f is a function of business parameter n.
+                  1 if πn.n < 1 else πn.n * πn.f(πn.n - 1),
+                  ['n'], πf),
+                ['f'], πsf)(
+                  Λ(lambda πm:  # Delayed application of business code sf(sf).
+                    πm.sf(πm.sf)(ECHO('πm', πm).m),
+                    ['m'], πsf)),
+              ['sf'])(  # <~~~ Apply to copy of self:
+            Λ(lambda πsf:
+              Λ(lambda πf:  # Domain code d is a function of business code f.
+                Λ(lambda πn:  # Business code f is a function of business parameter n.
+                  1 if πn.n < 1 else πn.n * πn.f(πn.n - 1),
+                  ['n'], πf),
+                ['f'], πsf)(
+                  Λ(lambda πm:  # Delayed application of business code sf(sf).
+                    πm.sf(πm.sf)(πm.m),
+                    ['m'], πsf)),
               ['sf']))(6)
         assert 720 == r
 
     def test_abstracted_domain_code(self):
-        r = Λ(lambda πd:  # d
-              Λ(lambda πsf:  # sf
-                πsf.d(Λ(lambda π: π.sf(π.sf)(π.m),
-                        ['m'], πsf)),
+        r = Λ(lambda πd:
+              Λ(lambda πsf:  # sf; copy this Λ below ...
+                πd.d(Λ(lambda πm: πm.sf(πm.sf)(ECHO('πm', πm).m),
+                       ['m'], πsf)),
                 ['sf'], πd)(  # <~~~ "squaring," i.e., self-application
-                  Λ(lambda πsf:  # sf
-                    πsf.d(Λ(lambda π: π.sf(π.sf)(π.m),
-                            ['m'], πsf)),
+                  Λ(lambda πsf:  # sf; .... right here
+                    πd.d(Λ(lambda πm: πm.sf(πm.sf)(πm.m),
+                           ['m'], πsf)),
                     ['sf'], πd)),
-              ['d'])(  # domain code
-            Λ(lambda πf:  # f
-              Λ(lambda π:  # n -- business code
-                1 if π.n < 1 else π.n * π.f(π.n - 1),
-                ['n'], πf),
-              ['f'])
+              ['d'])(  # d is the formal parameter for domain code
+            Λ(lambda πf:  # Domain code d is a function of business code f.
+              Λ(lambda πn:  # Business code f is a function of business parameter n.
+                1 if πn.n < 1 else πn.n * πn.f(πn.n - 1),
+                ['n'], πf),  # n: business parameter
+              ['f'])  # square of sf, recursive function
         )(6)
         assert r == 720
 
     def test_second_square(self):
-        r = Λ(lambda π:  # function of domain code, d
-              Λ(lambda π: π.g(π.g), ['g'], π)(
-                  Λ(lambda π: π.d(Λ(lambda π: π.sf(π.sf)(π.m), ['m'], π)),
-                    ['sf'], π)),
-              ['d'])(
-            Λ(lambda π:  # domain code; function of business code, f
-              Λ(lambda π:
-                1 if π.n < 1 else π.n * π.f(π.n - 1),  # business code
-                ['n'], π),  # business parameter, n
-              ['f'])  # recursive function
+        r = Λ(lambda πd:  # function of domain code, d
+              Λ(lambda πg:  # generic squaring gizmo
+                πg.g(πg.g),
+                ['g'], πd)(
+                  Λ(lambda πsf:
+                    πd.d(Λ(lambda πm: πm.sf(πm.sf)(πm.m),
+                           ['m'], πsf)),
+                    ['sf'], πd)),
+              ['d'])(  # formal parameter d for domain code
+            Λ(lambda πf:  # Domain code d is a function of business code f.
+              Λ(lambda πn:  # Business code f is a function of business parameter n.
+                1 if πn.n < 1 else πn.n * πn.f(πn.n - 1),  # business code
+                ['n'], πf),  # n: business parameter
+              ['f'])  # square of sf, recursive function
         )(6)
         assert r == 720
 
@@ -526,38 +545,71 @@ def fib_iter():
 
 @pytest.fixture
 def fib_fast():
+    # DEFINE('fib_fast',
+    #        Λ(lambda π:  # of f; level 1
+    #          Λ(lambda π:  # of a; level 2
+    #            Λ(lambda π:  # of n; level 3
+    #              (π.a, 1) if π.n < 2 else
+    #              Λ(lambda π:  # of n_1; level 4
+    #                (π.a, π.a[π.n_1])  # optimizer should remove these two lines
+    #                if π.n_1 in π.a else  # ^^^
+    #                Λ(lambda π:  # of fim1; level 5
+    #                  Λ(lambda π:  # of m1; level 6
+    #                    Λ(lambda π:  # of r1; level 7
+    #                      Λ(lambda π:  # of a1; level 8
+    #                        Λ(lambda π:  # of n_2; level 9
+    #                          (π.a1, π.r1 + π.a1[π.n_2])  # <~~~ a quick exit
+    #                          if π.n_2 in π.a1 else
+    #                          Λ(lambda π:  # of fim2; level 10
+    #                            Λ(lambda π:  # of m2; level 11
+    #                              Λ(lambda π:  # of r2; level 12
+    #                                Λ(lambda π:  # of a2; level 13
+    #                                  (π.a2, π.r1 + π.r2),  # <~~~ the money line
+    #                                  ['a2'], π)(π.m2[0] | {π.n_2: π.r2}),  # <~~~ update memo
+    #                                ['r2'], π)(π.m2[1]),  # unpack
+    #                              ['m2'], π)(π.fim2(π.n_2)),  # unpack
+    #                            ['fim2'], π)(π.f(π.a1)),  # <~~~ recurse
+    #                          ['n_2'], π)(π.n - 2),  # DRY
+    #                        ['a1'], π)(π.m1[0] | {π.n_1: π.r1}),  # <~~~ update memo
+    #                      ['r1'], π)(π.m1[1]),  # unpack
+    #                    ['m1'], π)(π.fim1(π.n_1)),  # unpack
+    #                  ['fim1'], π)(π.f(π.a)),  # <~~~ recurse
+    #                ['n_1'], π)(π.n - 1),  # DRY
+    #              ['n'], π),  # business parameter
+    #            ['a'], π),  # curried memo
+    #          ['f']))  # domain code
     DEFINE('fib_fast',
-           Λ(lambda π:  # of f; level 1
-             Λ(lambda π:  # of a; level 2
-               Λ(lambda π:  # of n; level 3
-                 (π.a, 1) if π.n < 2 else
-                 Λ(lambda π:  # of n_1; level 4
-                   (π.a, π.a[π.n_1])  # optimizer should remove these two lines
-                   if π.n_1 in π.a else  # ^^^
-                   Λ(lambda π:  # of fim1; level 5
-                     Λ(lambda π:  # of m1; level 6
-                       Λ(lambda π:  # of r1; level 7
-                         Λ(lambda π:  # of a1; level 8
-                           Λ(lambda π:  # of n_2; level 9
-                             (π.a1, π.r1 + π.a1[π.n_2])  # <~~~ a quick exit
-                             if π.n_2 in π.a1 else
-                             Λ(lambda π:  # of fim2; level 10
-                               Λ(lambda π:  # of m2; level 11
-                                 Λ(lambda π:  # of r2; level 12
-                                   Λ(lambda π:  # of a2; level 13
-                                     (π.a2, π.r1 + π.r2),  # <~~~ the money line
-                                     ['a2'], π)(π.m2[0] | {π.n_2: π.r2}),  # <~~~ update memo
-                                   ['r2'], π)(π.m2[1]),  # unpack
-                                 ['m2'], π)(π.fim2(π.n_2)),  # unpack
-                               ['fim2'], π)(π.f(π.a1)),  # <~~~ recurse
-                             ['n_2'], π)(π.n - 2),  # DRY
-                           ['a1'], π)(π.m1[0] | {π.n_1: π.r1}),  # <~~~ update memo
-                         ['r1'], π)(π.m1[1]),  # unpack
-                       ['m1'], π)(π.fim1(π.n_1)),  # unpack
-                     ['fim1'], π)(π.f(π.a)),  # <~~~ recurse
-                   ['n_1'], π)(π.n - 1),  # DRY
-                 ['n'], π),  # business parameter
-               ['a'], π),  # curried memo
+           Λ(lambda πf:  # of f; level 1
+             Λ(lambda πa:  # of a; level 2
+               Λ(lambda πn:  # of n; level 3
+                 (πn.a, 1) if πn.n < 2 else
+                 Λ(lambda πn1:  # of n_1; level 4
+                   (πn1.a, πn1.a[πn1.n_1])  # optimizer should remove these two lines
+                   if πn1.n_1 in πn1.a else  # ^^^
+                   Λ(lambda πfim1:  # of fim1; level 5
+                     Λ(lambda πm1:  # of m1; level 6
+                       Λ(lambda πr1:  # of r1; level 7
+                         Λ(lambda πa1:  # of a1; level 8
+                           Λ(lambda πn2:  # of n_2; level 9
+                             (πn2.a1, πn2.r1 + πn2.a1[πn2.n_2])  # <~~~ a quick exit
+                             if πn2.n_2 in πn2.a1 else
+                             Λ(lambda πfim2:  # of fim2; level 10
+                               Λ(lambda πm2:  # of m2; level 11
+                                 Λ(lambda πr2:  # of r2; level 12
+                                   Λ(lambda πa2:  # of a2; level 13
+                                     (πa2.a2, πa2.r1 + πa2.r2),  # <~~~ the money line
+                                     ['a2'], πr2)(πr2.m2[0] | {πr2.n_2: πr2.r2}),  # <~~~ update memo
+                                   ['r2'], πm2)(πm2.m2[1]),  # unpack
+                                 ['m2'], πfim2)(πfim2.fim2(πfim2.n_2)),  # unpack
+                               ['fim2'], πn2)(πn2.f(πn2.a1)),  # <~~~ recurse
+                             ['n_2'], πa1)(πa1.n - 2),  # DRY
+                           ['a1'], πr1)(πr1.m1[0] | {πr1.n_1: πr1.r1}),  # <~~~ update memo
+                         ['r1'], πm1)(πm1.m1[1]),  # unpack
+                       ['m1'], πfim1)(πfim1.fim1(πfim1.n_1)),  # unpack
+                     ['fim1'], πn1)(πn1.f(πn1.a)),  # <~~~ recurse
+                   ['n_1'], πn)(πn.n - 1),  # DRY
+                 ['n'], πa),  # business parameter
+               ['a'], πf),  # curried memo
              ['f']))  # domain code
     yield None
     del ΓΠ.ϕ.fib_fast
@@ -832,9 +884,62 @@ class TestLetStar:
                      body=Ξ(Λ(lambda π: π.w)))
         assert 1806 == r
 
-    def test_procs_as_vars(self):
+    def test_depth_3_Ξ_params_no_free_vars(self):
+        r = LET_STAR([
+            ('z', 42),
+            ('y', Ξ(Λ(lambda π: π.zz + 1, ['zz']),
+                    [Var('z')])),
+            # Use parameters:
+            ('w', Ξ(Λ(lambda π: ECHO('π', π).zzz * π.yy, ['zzz', 'yy']),
+                    [Var('z'), Var('y')])
+             )],
+            body=Ξ(Λ(lambda π: π.w)))
+        assert 1806 == r
+
+    def test_depth_3_Ξ_params_with_free_vars(self):
+        r = LET_STAR([
+            ('z', 42),
+            ('y', Ξ(Λ(lambda π: π.zz + 1, ['zz']),
+                    [Var('z')])),
+            # Ignore parameters; use free variables:
+            ('w', Ξ(Λ(lambda π: ECHO('π', π).z * π.y, ['zzz', 'yy']),
+                    [Var('z'), Var('y')])
+             )],
+            body=Ξ(Λ(lambda π: π.w)))
+        assert 1806 == r
+
+    def test_body_evaluating_closure(self):
         r = LET_STAR([('g', Λ(lambda π: π.x * π.x, ['x']))],
                      body=Ξ(Λ(lambda π: π.g(42))))
+        assert r == 1764
+
+    def test_body_returning_closure(self):
+        α = LET_STAR([('g', Λ(lambda π: π.x * π.x, ['x']))],
+                     body=Ξ(Λ(lambda π: π.g)))
+        r = α(42)
+        assert r == 1764
+
+    def test_body_returning_procedure(self):
+        r = LET_STAR([('g', Λ(lambda π: π.x * π.x, ['x']))],
+                     body=Λ(lambda π: π.g))
+        assert isinstance(r, Procedure)
+
+    def test_body_evaluating_returned_closure(self):
+        foo = LET_STAR([('g', Λ(lambda π: π.x * π.x, ['x']))],
+                       body=Λ(lambda π: π.g))
+        r = foo()(42)
+        assert r == 1764
+
+    def test_procedures_as_bound_vars(self):
+        r = LET_STAR([('g', Λ(lambda π: π.x * π.x, ['x']))],
+                     body=Ξ(Λ(lambda π:
+                              π.gg(42), ['gg']), [Var('g')]))
+        assert r == 1764
+
+    def test_closures_as_bound_vars(self):
+        r = LET_STAR([('g', Λ(lambda π: π.x * π.x, ['x']))],
+                     body=Ξ(Λ(lambda π:
+                              π.gg, ['gg']), [Var('g')]))(42)
         assert r == 1764
 
     def test_no_leak(self):

@@ -224,7 +224,7 @@ class Procedure:
 def Λ(body: "(π: Any) -> Any",
       parameters=None,  # default empty
       π=ΓΠ  # default global
-) -> Procedure:
+      ) -> Procedure:
     ρ = Procedure(
         code={"body": body,
               "parameters": parameters or []},
@@ -404,25 +404,25 @@ def DEFINE(
 
 
 DEFINE('Υ1',
-       Λ(lambda π:  # function of domain code, d
-         Λ(lambda π: π.g(π.g), ['g'], π)(
+       Λ(lambda πd:  # function of domain code, d
+         Λ(lambda πg: πg.g(πg.g), ['g'], πd)(
              # of business code of one parameter
-             Λ(lambda π: π.d(
-                 Λ(lambda π: π.sf(π.sf)(π.m),
-                   ['m'], π)),
-               ['sf'], π)),
+             Λ(lambda πsf:
+               πd.d(Λ(lambda π: π.sf(π.sf)(π.m),
+                      ['m'], πsf)),
+               ['sf'], πd)),
          ['d']))
 
 # λ d: (λ g: g[g])(λ sf: d[λ m, c, x: sf[sf][m, c, x]])
 DEFINE('Υ3',
-       Λ(lambda π:  # of d, the domain code ...
-         Λ(lambda π: π.g(π.g), ['g'], π)(
+       Λ(lambda πd:  # of d, the domain code ...
+         Λ(lambda πg: πg.g(πg.g), ['g'], πd)(
              # ... of business code of three parameters
-             Λ(lambda π: π.d(  # domain code
+             Λ(lambda πsf: πd.d(  # domain code
                  Λ(lambda π:
-                   π.sf(π.sf)(π.m, π.c, π.x),  # business code
-                   ['m', 'c', 'x'], π)),  # business parameters
-               ['sf'], π)),
+                   π.sf(π.sf)(π.μ, π.γ, π.ξ),  # business code
+                   ['μ', 'γ', 'ξ'], πsf)),  # business parameters
+               ['sf'], πd)),
          ['d']))
 
 
@@ -513,49 +513,55 @@ def LOOP2(d: Procedure) -> Procedure:  # domain code
     return ρ
 
 
-# Don't bother generalizing this one now:
+# Don't bother generalizing Υ2C now:
 
 DEFINE('Υ2C',
-       Λ(lambda π:  # function of domain code, d ...
-         Λ(lambda π: π.g(π.g), ['g'], π)(
+       Λ(lambda πd:  # function of domain code, d ...
+         Λ(lambda πg: πg.g(πg.g), ['g'], πd)(
              # with business code of 2 parameters, curried
-             Λ(lambda π:
-               π.d(Λ(lambda π:
-                     Λ(lambda π: π.sf(π.sf)(π.m)(π.n),
-                       ['n'], π),
-                     ['m'], π)),
-               ['sf'], π)),
+             Λ(lambda πsf:
+               πd.d(Λ(lambda π:
+                      Λ(lambda πn:
+                        # Notice double application because of currying.
+                        πn.sf(πn.sf)(πn.m)(πn.n),
+                        ['n'], π),
+                      ['m'], πsf)),
+               ['sf'], πd)),
          ['d']))
 
 DEFINE('Υ2',
-       Λ(lambda π:  # of d, the domain code ...
-         Λ(lambda π: π.g(π.g), ['g'], π)(
+       Λ(lambda πd:  # of d, the domain code ...
+         Λ(lambda πg: πg.g(πg.g), ['g'], πd)(
              # of business code of two parameters
-             Λ(lambda π:
-               π.d(Λ(lambda π: π.sf(π.sf)(π.m, π.c),
-                     ['m', 'c'], π)),
-               ['sf'], π)),
+             Λ(lambda πsf:
+               # single application to two arguments; no currying
+               πd.d(Λ(lambda π: π.sf(π.sf)(π.m, π.c),
+                      ['m', 'c'], πsf)),
+               ['sf'], πd)),
          ['d']))
 
 DEFINE('ΥN',
-       Λ(lambda π:  # of d, the domain code and vars ...
-         Λ(lambda π: π.g(π.g), ['g'], π)(
+       Λ(lambda πd:  # of d, the domain code and vars ...
+         Λ(lambda πg: πg.g(πg.g), ['g'], πd)(
              # of business code of N parameters
-             Λ(lambda π:
-               π.d(Λ(lambda π: π.sf(π.sf)(
-                   *[π[var] for var in π.vars_]),
-                     π.vars_, π)),
-               ['sf'], π)),
+             Λ(lambda πsf:
+               πd.d(Λ(lambda πvs:
+                      πvs.sf(πvs.sf)(
+                          *[πvs[var] for var in πvs.vars_]),
+                      πsf.vars_,
+                      πsf)),
+               ['sf'], πd)),
          ['d', 'vars_']))
 
 DEFINE('Υ5',
-       Λ(lambda π:  # of d, the domain code ...
-         Λ(lambda π: π.g(π.g), ['g'], π)(
+       Λ(lambda πd:  # of d, the domain code ...
+         Λ(lambda πg: πg.g(πg.g), ['g'], πd)(
              # of business code of five parameters
-             Λ(lambda π: π.d(
-                 Λ(lambda π: π.sf(π.sf)(π.α, π.β, π.γ, π.δ, π.ζ),
-                   ['α', 'β', 'γ', 'δ', 'ζ'], π)),
-               ['sf'], π)),
+             Λ(lambda πsf:
+               πd.d(
+                   Λ(lambda π: π.sf(π.sf)(π.α, π.β, π.γ, π.δ, π.ζ),
+                     ['α', 'β', 'γ', 'δ', 'ζ'], πsf)),
+               ['sf'], πd)),
          ['d']))
 
 
@@ -716,7 +722,8 @@ def DO_NTC(
         pred: Procedure,
         value: Any,
         body: Procedure,
-        π: Environment = ΓΠ):
+        π: Environment = ΓΠ
+) -> Any:
     """(DO ((<var1> <init1> <λstep1>)
             (<var2> <init2> <λstep2>
             . . .
@@ -738,12 +745,12 @@ def DO_NTC(
     setattr(E1.ϕ, 'βody', CHECK_TYPE(body, Procedure))
     r = LABELS([(
         'λoop',
-        Λ(lambda π:
-          (EVAL(Ξ('vaλue'), π)
-           if EVAL(Ξ('πred'), π)
-           else π.λoop(
-              EVAL(Ξ('βody'), π),
-              *[EVAL(Ξ(f'σteps_{i}'), π)
+        Λ(lambda πb:
+          (EVAL(Ξ('vaλue'), πb)
+           if EVAL(Ξ('πred'), πb)
+           else πb.λoop(
+              EVAL(Ξ('βody'), πb),
+              *[EVAL(Ξ(f'σteps_{i}'), πb)
                 for i in range(len(steps))])),
           ['βody_result', *vars]))],
         Ξ('λoop',
@@ -780,12 +787,12 @@ def DO(
     r = LABELS([(
         'λoop',
         Λ(lambda πd:  # Domain code is a functino of 'λf', ...
-          Λ(lambda π:  # ... which is busines code of N params.
-            (EVAL(Ξ('vaλue'), π)
-             if EVAL(Ξ('πred'), π)
-             else π.λf(  # <~~~ tail recursion
-                EVAL(Ξ('βody'), π),
-                *[EVAL(Ξ(f'σteps_{i}'), π)
+          Λ(lambda πb:  # ... which is busines code of N params.
+            (EVAL(Ξ('vaλue'), πb)
+             if EVAL(Ξ('πred'), πb)
+             else πb.λf(  # <~~~ tail recursion
+                EVAL(Ξ('βody'), πb),
+                *[EVAL(Ξ(f'σteps_{i}'), πb)
                   for i in range(len(steps))])),
             ['βody_result', *vars], π=πd),
           ['λf'], π=E1))],
