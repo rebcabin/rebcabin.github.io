@@ -51,11 +51,11 @@ The use-cases above are similar to those for a SQL algebraizer. Many SQL impleme
 
 +++
 
-An older algebraic technique, [Denotational Semantics, was defined for R5RS](https://schemers.org/Documents/Standards/R5RS/HTML/r5rs-Z-H-10.html)
+TODO: An older algebraic technique, [Denotational Semantics, was defined for R5RS](https://schemers.org/Documents/Standards/R5RS/HTML/r5rs-Z-H-10.html). It focused on the non-imperative aspects of scheme. This reconstruction has not yet been compared to that one.
 
 +++
 
-We follow the paper more-or-less directly, with reference to [SICP](https://sarabander.github.io/sicp/).
+We follow Steele's paper more-or-less directly, with reference to [SICP](https://sarabander.github.io/sicp/).
 
 +++
 
@@ -1042,7 +1042,7 @@ $\Xi$ honors sub-environments even when looking up procedures and arguments by t
   EVAL(
       Ξ('square',  # Look me up in ΓΠ.
         [Var('ϕοοβαρ')]),  # Look me up in π.
-      π),
+      ECHO('π', π)),
   ['ϕοοβαρ'])(  # formal parameter of the Λ
     42)  # actual argument of implied call of APPLY
 ```
@@ -1177,7 +1177,7 @@ Here is a procedure of `f` and `x` that applies `f` to `x`. Bind `f` to `square`
 ```{code-cell} ipython3
 # Outer parens necessary to break lines for comments (Python syntax booger).
 (Λ(lambda E1:     # Calling this λ chains environment E1 to ΓΠ.
-  E1.f(E1.x),     # Apply E1.f to E1.x.
+  E1.f(ECHO('E1', E1).x),     # Apply E1.f to E1.x.
   ['f', 'x'])     # formal parameters
 (ΓΠ.square, 42))  # <~~~ Bind f to square, x to 42.
 ```
@@ -1187,7 +1187,7 @@ Here is a procedure that applies an internal anonymous procedure of `n` in `E2`.
 ```{code-cell} ipython3
 Λ(lambda E1:      # Calling this λ chains environment E1 to ΓΠ.
   Λ(lambda E2:    # Calling this λ chains environment E2 to ΓΠ.
-    E2.n * E2.n,  # <~~~ n is bound in E2;
+    E2.n * ECHO('E2', E2).n,  # <~~~ n is bound in E2;
     ['n']         #      E2 is sibling to E1.
    )(             # Parent environment implicitly ΓΠ.
      E1.m),       # <~~~ invocation; Look up m in E1, bind to n in E2.
@@ -1230,7 +1230,7 @@ Here's the example above in Schemulator:
 ```{code-cell} ipython3
 Λ(lambda E1:      # Calling it creates environment E1 in ΓΠ.
   Λ(lambda E2:    # !!!! Define in E1 !!!!
-    E2.n * E2.m,  # <~~~ n in E1, x in E2.
+    E2.n * ECHO('E2', E2).m,  # <~~~ n in E1, x in E2.
     ['n'],        #      (E2 is child of E1, written E1<--E2)
     E1)(          # !!!! Parent environment *explicitly* E1 !!!!
          E1.m),   # <~~~ Look up n in E1, bind x in E2->E1
@@ -1296,8 +1296,6 @@ Scheme does not support dynamic closures, i.e., re-defining environments at run 
 
 ```{raw-cell}
 > (define foo (lambda (n) (* n m))) ;; m can never be bound!
-> foo
-#<procedure #5 foo>
 > ((lambda (m) (foo 42)) 43)
 *** ERROR IN foo, (console)@8.28 -- Unbound variable: m
 ```
@@ -1319,7 +1317,7 @@ If we do both, defining _and_ evaluating the inner $\lambda$ in E1, we get only 
 
 +++
 
-Because the two variables `m` and `n` are in different environments, they can have the same name. `E2.n` ___shadows___ `E1.n`, which is inaccessible from `E2`.
+Because the two variables `m` and `n` are in different environments, they can have the same name. `E2.n` ___shadows___ `E1.n`, which is inaccessible from `E2`. Notice, by inspecting the addresses in hex, that `E2` precedes `E1` in the chain, so a lookup of `n` starting at `E2` will find `n` there and never progress to `E1`.
 
 ```{code-cell} ipython3
 Λ(lambda E1:
@@ -3107,6 +3105,14 @@ def DO(
      π=πo),
   ['m'])(800)
 ```
+
+# GOTO
+
++++
+
+TODO
+
++++
 
 # COND
 
