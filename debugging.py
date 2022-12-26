@@ -115,11 +115,17 @@ class Environment:
         if self._is_global():
             return lower
 
-        temp = self._trunk()
+        # temp = self._trunk()
+        # branch = temp
+        # while branch.π:
+        #     branch = branch.π
+        # branch.π = lower  # MONKEY PATCH!
+
+        temp = lower._trunk()
         branch = temp
         while branch.π:
             branch = branch.π
-        branch.π = lower  # MONKEY PATCH!
+        branch.π = self  # MONKEY PATCH!
         return temp
 
     def _trunk(self) -> "Environment":

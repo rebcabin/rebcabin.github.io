@@ -1,0 +1,99 @@
+The accompanying program provides an executable implementation of the 
+denotational semantics for the Scheme language, as defined in R5RS. The program 
+is itself written in R5RS Scheme.
+
+Full documentation for this program is currently available at:
+http://www.appsolutions.com/SchemeDS/
+
+I highly recommend perusing the above documentation in order to understand 
+the limitations and issues involved in running the provided interpreter.
+
+The full documentation is not yet packaged in distributable form (this will 
+change).
+
+If you can't wait for the incomparable religious experience of interacting 
+directly with the actual denotational semantics of the official R5RS Scheme 
+language, all you need to know is right here. It's very easy to get the DS-based 
+interpreter up and running in any reasonably standard Scheme.
+
+Unzip the files into a new directory, change to that directory, run your 
+favorite Scheme interpreter, and type:
+
+	(load "repl.scm")
+
+You should get a double angle prompt, >>, which indicates that the interpreter's 
+REPL is running successfully.  You can now type Scheme expressions and, if 
+they're supported by the interpreter, they should be evaluated and the result 
+should be displayed.
+
+No configuration should be required.  Scheme interpreters on which this program 
+has been successfully tested include (alphabetically) Chicken, Guile, JScheme, 
+Kawa, MIT Scheme (DrScheme and MzScheme, v103 and v202), PLT Scheme, Scheme 48, 
+SISC, and UMB Scheme.
+
+Be aware that the interpreter has a very small library, and is by no means 
+complete.  It is intended to provide a way of interacting with the executable 
+denotational semantics, not to be a complete implementation of Scheme.
+
+The current state of the interpreter is described in the web documentation at 
+http://www.appsolutions.com/SchemeDS/
+
+Error handling is currently imperfect, and many kinds of errors will dump you 
+unceremoniously into the host Scheme.  To restart the interpreter in this case, 
+type:
+
+	(repl)
+
+Note that all definitions from the previous session will have been lost.
+
+The interpreter supports a procedure for examining the current store 
+function, i.e. the interpreter's "memory".  To dump the store, type:
+
+	(dump-store)
+
+For information about the format and meaning of the store, see the web 
+documentation.
+
+The interpreter supports the 'load' procedure for loading Scheme source files. 
+Two sample source files are provided: factorial.scm and tak.scm. Here's a 
+transcript of their use:
+
+>> (load "factorial.scm")
+
+Value: #t
+
+>> (factorial 12)
+
+Value: 479001600
+
+>> (load "tak.scm")
+
+Value: #t
+
+>> (tak 12 8 4)    ; takes a while
+
+Value: 5
+
+>> (exit)          ; exits to host Scheme or shell prompt
+
+
+Note that after running tak with the above parameters, the interpreter's store 
+has been enlarged to the point where performance is noticeably reduced.  Exiting 
+and restarting the interpreter using {-(repl)} is suggested.
+
+If you have any questions, feel free to email me at anton@appsolutions.com.
+
+===========================================================================
+Copyright (C) 2002 Anton van Straaten <anton@appsolutions.com>
+
+The accompanying program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License, 
+version 2, as published by the Free Software Foundation.
+
+This program is distributed in the hope that it will be useful, 
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, see http://www.gnu.org/copyleft/gpl.html
