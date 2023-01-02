@@ -11,7 +11,6 @@ from debugging import (
     DO_NTC,
     ECHO,
     EVAL,
-    Environment,
     IllegalArgumentsError,
     LABELS,
     LET,
@@ -144,23 +143,34 @@ class TestApplication:
     def test_Ξ(self, square):
         assert 1764 == EVAL(Ξ('square', [42]))
 
+    def test_call_syntax(self, square):
+        assert 1764 == Ξ('square', [42])()
+        assert 1764 == Application(ΓΠ.square, [42])()
+
     def test_Var(self, square, γόὂ):
         assert 1849 == \
                EVAL(
                    Ξ('square',  # find proc in global env
                      [Var('γόὂ')]))  # find binding in global env
 
-    def test_in_body(self, square):
+    def test_Λ_call(self, square):
         assert 1849 == ΓΠ.square(43)
-        assert 1849 == \
-               Λ(lambda π:
-                 ΓΠ.square(π.foobar),
-                 ['foobar'])(43)
-        assert 1849 == \
-               Λ(lambda π:
-                 EVAL(Ξ(ΓΠ.square, [Var('ϕοοβαρ')]),
-                      π),
-                 ['ϕοοβαρ'])(43)
+        assert 1849 == Λ(lambda π:
+                         ΓΠ.square(π.foobar),
+                         ['foobar'])(43)
+
+    def test_in_body(self, square):
+        assert 1849 == Λ(lambda π:
+                         EVAL(Ξ(ΓΠ.square,
+                                [Var('ϕοοβαρ')]),
+                              π),  # <~~~ argument to EVAL
+                         ['ϕοοβαρ'])(43)
+
+    def test_in_body_call_syntax(self, square):
+        assert 1849 == Λ(lambda π:
+                         Ξ(ΓΠ.square, [Var('ϕοοβαρ')])(
+                             π),  # <~~~ argument to Ξ.__call__
+                         ['ϕοοβαρ'])(43)
 
     def test_forgetting_π(self, square):
         with pytest.raises(NameError):
@@ -227,10 +237,10 @@ def saxpy():
     DEFINE(
         'saxpy',
         Λ(lambda π:
-          numpy.dot(π.a, π.x) \
-              if isinstance(π.a, numpy.ndarray)
-                 and isinstance(π.x, numpy.ndarray) \
-              else π.a * π.x + π.y,
+          numpy.dot(π.a, π.x)
+          if (isinstance(π.a, numpy.ndarray)
+              and isinstance(π.x, numpy.ndarray))
+          else π.a * π.x + π.y,
           ['a', 'x', 'y']))
     yield None
     del ΓΠ.ϕ.saxpy
@@ -239,12 +249,14 @@ def saxpy():
 @pytest.fixture
 def fact_iter_0():
     DEFINE('fact_iter_0',
-           Λ(lambda π: π.product if π.counter > π.max_count else \
-               π.fact_iter_0(
-                   π.counter * π.product,
-                   π.counter + 1,
-                   π.max_count
-               ), ['product', 'counter', 'max_count']));
+           Λ(lambda π: π.product
+           if (π.counter > π.max_count)
+           else
+           π.fact_iter_0(
+               π.counter * π.product,
+               π.counter + 1,
+               π.max_count
+           ), ['product', 'counter', 'max_count']));
     yield None
     del ΓΠ.ϕ.fact_iter_0
 
@@ -281,23 +293,24 @@ class TestFirstClassness:
              (ΓΠ.square, 42))  # <~~~ Bind f to square, x to 42.
         assert r == 1764
 
-    def test_no_implicit_chaining(self):
+    def test_sibling_negative(self):
+        """Read the comments bottom-up."""
         with pytest.raises(NameError):
-            Λ(lambda E1:  # Calling this λ chains environment E1 to ΓΠ.
-              Λ(lambda E2:  # Calling this λ chains environment E2 to ΓΠ.
-                E2.n * ECHO('E2', E2).m,  # <~~~ n is bound in E2; m is not bound in E2.
+            Λ(lambda E1:  # Calling this Λ chains environment E1 to ΓΠ.
+              Λ(lambda E2:  # Calling this Λ chains environment E2 to ΓΠ.
+                E2.n * E2.m,  # <~~~ n is bound in E2; m is not found or bound.
                 ['n']  # E2 is sibling to E1.
-                )(  # Parent environment implicitly ΓΠ.
+                )(  # Parent environment of E2 is implicitly ΓΠ.
                   E1.m),  # <~~~ invocation. Look up m in E1, bind to n in E2.
               ['m'])(42)  # <~~~ Bind m to 42 in E1.
 
-    def test_anon_sibling(self):
+    def test_sibling_positive(self):
         r = Λ(lambda E1:  # Create environment E1 in ΓΠ.
               Λ(lambda E2:  # Create environment E2 in ΓΠ.
                 E2.n * E2.n,  # <~~~ n is bound in E2.
-                ['n']  # (E2 is sibling to E1)
-                )  # Parent environment implicitly ΓΠ.
-              (E1.m),  # <~~~ Look up m in E1, bind to n in E2.
+                ['n']  # E2 is sibling to E1; parent of E2 is ΓΠ.
+                )(  # Parent of E1 is implicitly ΓΠ.
+                  E1.m),  # <~~~ Look up m in E1, bind to n in E2.
               ['m'])(42)  # <~~~ Bind m to 42 in E1.
         assert r == 1764
 
@@ -306,18 +319,18 @@ class TestFirstClassness:
               Λ(lambda E2:  # Create environment E2 in ΓΠ.
                 E2.n * E2.n,  # <~~~ n is bound in E2.
                 ['n']  # (E2 is sibling to E1)
-                )  # Parent environment implicitly ΓΠ.
-              # DIFFERENT ............................
-              (E1.n),  # <~~~ Look up n in E1, bind to n in E2.
+                )(  # Parent environment implicitly ΓΠ.
+                  # DIFFERENT ............................
+                  E1.n),  # <~~~ Look up n in E1, bind to n in E2.
               ['n'])(42)  # <~~~ a different n bound to 42 in E1.
         assert r == 1764
 
     def test_anon_child(self):
         r = Λ(lambda E1:  # Calling it creates environment E1 in ΓΠ.
-              Λ(lambda E2:  # !!!! Define in E1 !!!!
+              Λ(lambda E2:  # LOOK BELOW !!!! Define in E1. Chain E2 to E1 !!!!
                 E2.n * E2.m,  # <~~~ n in E1, x in E2.
                 ['n'],  # (E2 is child of E1, written E1<--E2)
-                E1)(  # !!!! Parent environment *explicitly* E1 !!!!
+                E1)(  # DIFFERENT !!!! Parent environment *explicitly* E1 !!!!
                   E1.m),  # <~~~ Look up n in E1, bind x in E2->E1
               ['m'])(42)  # <~~~ Bind n to 42 in E1
         assert r == 1764
@@ -545,39 +558,6 @@ def fib_iter():
 
 @pytest.fixture
 def fib_fast():
-    # DEFINE('fib_fast',
-    #        Λ(lambda π:  # of f; level 1
-    #          Λ(lambda π:  # of a; level 2
-    #            Λ(lambda π:  # of n; level 3
-    #              (π.a, 1) if π.n < 2 else
-    #              Λ(lambda π:  # of n_1; level 4
-    #                (π.a, π.a[π.n_1])  # optimizer should remove these two lines
-    #                if π.n_1 in π.a else  # ^^^
-    #                Λ(lambda π:  # of fim1; level 5
-    #                  Λ(lambda π:  # of m1; level 6
-    #                    Λ(lambda π:  # of r1; level 7
-    #                      Λ(lambda π:  # of a1; level 8
-    #                        Λ(lambda π:  # of n_2; level 9
-    #                          (π.a1, π.r1 + π.a1[π.n_2])  # <~~~ a quick exit
-    #                          if π.n_2 in π.a1 else
-    #                          Λ(lambda π:  # of fim2; level 10
-    #                            Λ(lambda π:  # of m2; level 11
-    #                              Λ(lambda π:  # of r2; level 12
-    #                                Λ(lambda π:  # of a2; level 13
-    #                                  (π.a2, π.r1 + π.r2),  # <~~~ the money line
-    #                                  ['a2'], π)(π.m2[0] | {π.n_2: π.r2}),  # <~~~ update memo
-    #                                ['r2'], π)(π.m2[1]),  # unpack
-    #                              ['m2'], π)(π.fim2(π.n_2)),  # unpack
-    #                            ['fim2'], π)(π.f(π.a1)),  # <~~~ recurse
-    #                          ['n_2'], π)(π.n - 2),  # DRY
-    #                        ['a1'], π)(π.m1[0] | {π.n_1: π.r1}),  # <~~~ update memo
-    #                      ['r1'], π)(π.m1[1]),  # unpack
-    #                    ['m1'], π)(π.fim1(π.n_1)),  # unpack
-    #                  ['fim1'], π)(π.f(π.a)),  # <~~~ recurse
-    #                ['n_1'], π)(π.n - 1),  # DRY
-    #              ['n'], π),  # business parameter
-    #            ['a'], π),  # curried memo
-    #          ['f']))  # domain code
     DEFINE('fib_fast',
            Λ(lambda πf:  # of f; level 1
              Λ(lambda πa:  # of a; level 2
@@ -863,7 +843,19 @@ class TestLetStar:
         """Instead of macros, we have Ξ applications."""
         r = LET_STAR([('z', 42),
                       ('y', 43)],
-                     Ξ(Λ(lambda π: π.z * π.y)))
+                     Ξ(Λ(lambda π: ECHO('π', π).z * π.y)))
+        assert 1806 == r
+
+    def test_let_over_depth_2_Ξ_free_vars(self):
+        r = LET(
+            [('q', 0),
+             ('y', 0)],
+            Ξ(Λ(lambda π:
+                LET_STAR(
+                    [('z', 42),
+                     ('y', 43)],
+                    Ξ(Λ(lambda π: ECHO('π', π).z * π.y)),
+                    π=π))))
         assert 1806 == r
 
     def test_depth_3_Ξ_free_vars(self):
@@ -1452,3 +1444,58 @@ class TestDo:
         assert r == \
                771053011335386004144639397775028360595556401816010239163410994033970851827093069367090769795539033092647861224230677444659785152639745401480184653174909762504470638274259120173309701702610875092918816846985842150593623718603861642063078834117234098513725265045402523056575658860621238870412640219629971024686826624713383660963127048195572279707711688352620259869140994901287895747290410722496106151954257267396322405556727354786893725785838732404646243357335918597747405776328924775897564519583591354080898117023132762250714057271344110948164029940588827847780442314473200479525138318208302427727803133219305210952507605948994314345449325259594876385922128494560437296428386002940601874072732488897504223793518377180605441783116649708269946061380230531018291930510748665577803014523251797790388615033756544830374909440162270182952303329091720438210637097105616258387051884030288933650309756289188364568672104084185529365727646234588306683493594765274559497543759651733699820639731702116912963247441294200297800087061725868223880865243583365623482704395893652711840735418799773763054887588219943984673401051362280384187818611005035187862707840912942753454646054674870155072495767509778534059298038364204076299048072934501046255175378323008217670731649519955699084482330798811049166276249251326544312580289357812924825898217462848297648349400838815410152872456707653654424335818651136964880049831580548028614922852377435001511377656015730959254647171290930517340367287657007606177675483830521499707873449016844402390203746633086969747680671468541687265823637922007413849118593487710272883164905548707198762911703545119701275432473548172544699118836274377270607420652133092686282081777383674487881628800801928103015832821021286322120460874941697199487758769730544922012389694504960000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
         assert do_fact_ntc(small) == do_fact_tc(small)
+
+
+# (define (itak c x y z)
+#   (let ((itakx (lambda (c) (itak c (- x 1) y z)))
+#         (itaky (lambda (c) (itak c (- y 1) z x)))
+#         (itakz (lambda (c) (itak c (- z 1) x y))))
+#     (if (< y x)
+#      (let* ((lx (itakx (+ c 1)))
+#             (ly (itaky (+ (car lx) 1)))
+#             (lz (itakz (+ (car ly) 1))))
+#        (itak (+ (car lz) 1) (cadr lx) (cadr ly) (cadr lz)))
+#      (list c z))))
+#
+# (pp (itak 1  3  2  1))  ; (5 2)
+# (pp (itak 1 12  8  4))  ; (1733 5)
+# (pp (itak 1 18 12  6))  ; (63609 7)
+# ;; (pp (itak 1 28 20 12))  ; (2493349 13)
+
+@pytest.fixture
+def irtak():
+    "instrumented recursive tak"
+    DEFINE('irtak',
+           Λ(lambda πo:
+             LET([('itakx', Λ(lambda π: ΓΠ.irtak(π.c, π.x - 1, π.y, π.z), ['c'])),
+                  ('itaky', Λ(lambda π: ΓΠ.irtak(π.c, π.y - 1, π.z, π.x), ['c'])),
+                  ('itakz', Λ(lambda π: ΓΠ.irtak(π.c, π.z - 1, π.x, π.y), ['c']))],
+                 Ξ(Λ(lambda πi:
+                     LET_STAR(
+                         [('lx', Ξ(Λ(lambda π: π.itakx(π.c + 1)))),
+                          ('ly', Ξ(Λ(lambda π: π.itaky(π.lx[0] + 1)))),
+                          ('lz', Ξ(Λ(lambda π: π.itakz(π.ly[0] + 1))))],
+                         Ξ(Λ(lambda πii:
+                             ΓΠ.irtak(
+                                 πii.lz[0] + 1,
+                                 πii.lx[1],
+                                 πii.ly[1],
+                                 πii.lz[1]))),
+                         π=πi  # <~~~ don't forget me!
+                     ) if πi.y < πi.x
+                     else
+                     (πi.c, πi.z)
+                     )),
+                 π=πo),
+             ['c', 'x', 'y', 'z']))
+    yield None
+    del ΓΠ.ϕ.irtak
+
+
+class TestTak:
+
+    def test_let_over_let_star_3(self, irtak):
+        assert ΓΠ.irtak(1, 3, 2, 1) == (5, 2)  # 0msec
+        assert ΓΠ.irtak(1, 12, 8, 4) == (1733, 5)  # 72msec
+        # assert ΓΠ.irtak(1, 18, 12, 6) == (63609, 7)  # 2sec 521msec
+        # assert ΓΠ.irtak(1, 28, 20, 12) == (2493349, 13)  # 1min 36sec

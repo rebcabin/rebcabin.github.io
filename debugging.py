@@ -19,15 +19,15 @@ class Environment:
     Environment. Bindings in the frame are attributes on the
     object ϕ. Choose an empty function as the carrier object for
     such bindings / attributes. Bindings / attributes have a name and
-    a value. Retrieve the value of binding ξ in fraome ϕ of
+    a value. Retrieve the value of binding ξ in frame ϕ of
     Environment E via dot notation as in 'E.ϕ.ξ'. Set the value v
-    of binding ξ via 'settattr(E.ϕ, ξ, v)'. When getting values of
+    of binding ξ via 'setattr(E.ϕ, ξ, v)'. When getting values of
     bindings, it's OK to omit the ϕ, writing 'E.ξ', because of the
     overloaded __getattr__ of this class, Environment. Bracket
     notation is also OK, as in 'E["ξ"]', because of Environment's
     overloaded __getitem__."""
     ϕ: "() -> None"  # "frame," a nice place to hang attributes
-    π: "Environment"  # via Greek πηρι, short name for 'enclosing'
+    π: "Environment | None"  # via Greek πηρι, short name for 'enclosing'
 
     def _is_global(self):
         return self.π is None
@@ -43,7 +43,11 @@ class Environment:
 
     def _copy_trunk(self) -> "Environment":
         """Don't copy the global at the end, but do leave it
-        attached."""
+        attached. WARNING: this does not return a _trunk_
+        because the global environment remains at the end.
+        This avoids two traversals of the chain, once to
+        remove the global and again to splice something in
+        its place."""
         if self._is_global():
             return self
         r = self._copy()
@@ -128,7 +132,7 @@ class Environment:
         branch.π = self  # MONKEY PATCH!
         return temp
 
-    def _trunk(self) -> "Environment":
+    def _trunk(self) -> "Environment | None":
         """all but the last, global environment in a chain;
         Remove the pointer to global env in a copy of the
         penultimate. Called ONLY by _splice_onto_lower!
@@ -170,7 +174,7 @@ class Environment:
         result = ("(" + hex(id(self.ϕ))[-4:] +
                   (",ΓΠ" if is_global else "") +
                   ") ") + \
-                 pformat(str(list(vars(self.ϕ).keys()))) + \
+            pformat(str(list(vars(self.ϕ).keys()))) + \
                  (">" + self.π.__repr__()
                   if not is_global
                   else "")
@@ -192,7 +196,7 @@ Parameters = List[str]  # type synonym; positional, ordered arguments only
 
 
 def APPLY(proc: "Procedure",  # <~~~ in quotes because it's not defined yet.
-          args: List[Any],
+          args: List["Expression"] | None,
           π: Environment = ΓΠ) -> Any:  # defaults to global
     """forward reference; will be corrected. Needed to
     spec Procedure."""
@@ -227,10 +231,11 @@ class Procedure:
         return result
 
 
-def Λ(body: "(π: Any) -> Any",
-      parameters=None,  # default empty
-      π=ΓΠ  # default global
-      ) -> Procedure:
+def Λ(
+        body: "(π: Environment) -> Any",
+        parameters=None,  # default empty
+        π=ΓΠ  # default global
+) -> Procedure:
     ρ = Procedure(
         code={"body": body,
               "parameters": parameters or []},
@@ -255,11 +260,11 @@ from dataclasses import (dataclass, field)
 @dataclass
 class Application:
     head: Union[str, Procedure]
-    args: List[Any] = field(default_factory=list)  # args, not params!
+    args: List["Expression"] = field(default_factory=list)  # args, not params!
     π: Environment = ΓΠ
 
-    def __call__(self):
-        EVAL_APPLICATION(self, self.π)
+    def __call__(self, env: Environment | None = None):
+        return EVAL_APPLICATION(self, env or self.π)
 
     def __repr__(self):
         """for the debugger"""
@@ -280,12 +285,19 @@ class Var:
     sym: str
 
 
-from typing import Any
+from typing import Any, Tuple
 import numpy
+
+Atom = Union[str, int, float, bool]
+Expression = Union[
+    Dict, Tuple, List, numpy.ndarray,
+    Var, Application, Procedure,
+    Atom
+]
 
 
 def EVAL(
-        expr: Any,
+        expr: Expression,
         π: Environment = ΓΠ,
         tag: str = None
 ) -> Any:
@@ -333,7 +345,7 @@ from typing import Any, Dict, Tuple, List
 
 
 def EVAL(
-        expr: Any,
+        expr: Expression,
         π: Environment = ΓΠ,
         tag=None
 ) -> Any:
@@ -371,7 +383,7 @@ class IllegalArgumentsError(ValueError):
 
 def APPLY(
         proc: Procedure,
-        args=None,  # Python doesn't like mutable [] here, ...
+        args: List[Expression] | None = None,  # Python doesn't like mutable [] here, ...
         π: Environment = ΓΠ
 ) -> Any:
     if args is None:
@@ -401,12 +413,12 @@ def APPLY(
 
 def DEFINE(
         sym: str,
-        val: Any,
+        val: Expression,
         π: Environment = ΓΠ  # default
 ) -> None:
     """official Scheme"""
     setattr(π.ϕ, sym, val)
-    return val
+    return None
 
 
 DEFINE('Υ1',
@@ -653,16 +665,16 @@ BEGIN = BLOCK
 
 
 def LET_STAR(
-        binding_pairs: List[Tuple[str, Any]],
-        body: Union[Application, Procedure],
-        πl: Environment = ΓΠ
+        binding_pairs: List[Tuple[str, Expression]],
+        body: Expression,
+        π: Environment = ΓΠ
 ) -> Any:
     if len(binding_pairs) == 0:  # <~~~ Empty bindings are allowed.
-        ρ = EVAL(body, πl)
+        ρ = EVAL(body, π)
         return ρ
     key, val = binding_pairs[0]
-    E1 = Environment(lambda: None, πl)
-    setattr(E1.ϕ, key, EVAL(val, πl))
+    E1 = Environment(lambda: None, π)
+    setattr(E1.ϕ, key, EVAL(val, π))
     if len(binding_pairs) == 1:
         return EVAL(body, E1)
     else:
@@ -670,8 +682,8 @@ def LET_STAR(
 
 
 def LET(
-        pairs: List[Tuple[str, Any]],
-        body: Application,
+        pairs: List[Tuple[str, Expression]],
+        body: Expression,
         π: Environment = ΓΠ
 ) -> Any:
     if len(pairs) == 0:
@@ -688,8 +700,8 @@ def LET(
 
 
 def LETREC(
-        pairs: List[Tuple[str, Any]],
-        body: Union[Application, Procedure],
+        pairs: List[Tuple[str, Expression]],
+        body: Expression,
         π: Environment = ΓΠ
 ) -> Any:
     if len(pairs) == 0:
@@ -724,9 +736,9 @@ def CHECK_TYPE(x: Any, t: Any) -> Any:
 
 
 def DO_NTC(
-        triples: List[Tuple[str, Any, Procedure]],
+        triples: List[Tuple[str, Expression, Procedure]],
         pred: Procedure,
-        value: Any,
+        value: Expression,
         body: Procedure,
         π: Environment = ΓΠ
 ) -> Any:
@@ -766,9 +778,9 @@ def DO_NTC(
 
 
 def DO(
-        triples: List[Tuple[str, Any, Procedure]],
+        triples: List[Tuple[str, Expression, Procedure]],
         pred: Procedure,
-        value: Any,
+        value: Expression,
         body: Procedure,
         π: Environment = ΓΠ):
     """(DO ((<var1> <init1> <λstep1>)
@@ -802,8 +814,8 @@ def DO(
                   for i in range(len(steps))])),
             ['βody_result', *vars], π=πd),
           ['λf'], π=E1))],
-        Ξ(Λ(lambda π:
-            LOOPN(π.λoop, ['βody_result', *vars])
+        Ξ(Λ(lambda πl:
+            LOOPN(πl.λoop, ['βody_result', *vars])
             (None, *[EVAL(init, E1) for init in inits]))),
         E1)
     return r

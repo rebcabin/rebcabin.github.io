@@ -3,14 +3,14 @@
 ;;; Copyright (C) 2002 Anton van Straaten <anton@appsolutions.com>
 ;;;
 ;;; This program is free software; you can redistribute it and/or
-;;; modify it under the terms of the GNU General Public License, 
+;;; modify it under the terms of the GNU General Public License,
 ;;; version 2, as published by the Free Software Foundation.
-;;; 
-;;; This program is distributed in the hope that it will be useful, 
+;;;
+;;; This program is distributed in the hope that it will be useful,
 ;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;;; GNU General Public License for more details.
-;;; 
+;;;
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with this program; if not, see http://www.gnu.org/copyleft/gpl.html
 ;;;
@@ -42,15 +42,15 @@
     ; todo: validate (= e zero-length)
     (ds:send dse:initial-environment k)))
 
-;; Initial environment data.  This is not an environment itself - it is 
-;; used to initialize the environment.  Should be organized by type of 
+;; Initial environment data.  This is not an environment itself - it is
+;; used to initialize the environment.  Should be organized by type of
 ;; procedure, to support R5RS standard environments.  todo.
 (define (base-environment)
 
   ; r5rs-ds-environment: only what ds provides
   ;
   ; quasiquote use avoided because of laml
-  (list 
+  (list
     (cons 'cons ds:cons)
     (cons 'car ds:car)
     (cons 'cdr ds:cdr)
@@ -131,27 +131,30 @@
 ;; Local environment lookups delegate to the global environment via this function.
 (define (dse:initial-environment-global I)
   (let ((a (global-environment-lookup I)))
-    (if a 
+    (if a
         a
         (ds:wrong-wrong (string-append "undefined identifier: '" (symbol->string I) "'. " )))))
 
 
-;; expression-meaning-toplevel-definition 
-;; 
-;; Meaning of 'define' for global environment, i.e. top-level definitions.  Uses mutation.
-;; todo: validate against other meaning functions
+;; expression-meaning-toplevel-definition
+;;
+;; Meaning of 'define' for global environment, i.e. top-level definitions. Uses
+;; mutation. todo: validate against other meaning functions
 (define (expression-meaning-toplevel-definition I E*)
   (lambda (r k)
     (lambda (s)
       (let* ((a (global-environment-lookup I))
-             (s-prime 
+             (s-prime
                (if (not a)
                    ; Mutate global-environment - add (I . L) pair
                    (if (ds:location? (ds:new s))
                      (begin
-                       (set! global-environment (cons (cons I (ds:new s)) global-environment))
-                       ;; have to allocate the location, otherwise evaluation of expression in assignment could
-                       ;; use same location.  Might optimize this by not using expression-meaning-assignment.
+                       (set! global-environment
+                         (cons (cons I (ds:new s)) global-environment))
+                       ;; have to allocate the location, otherwise evaluation of
+                       ;; expression in assignment could use same location.
+                       ;; Might optimize this by not using
+                       ;; expression-meaning-assignment.
                        (ds:update (ds:project-location (ds:new s)) #f s))
                      ((ds:wrong "out of memory") s))
                    s)))
@@ -161,16 +164,17 @@
          s-prime)))))
 
 (define (expression-meaning-procedure-definition sig E*)
-  (expression-meaning-toplevel-definition (car sig) 
-                                          (cons 'lambda 
+  (expression-meaning-toplevel-definition (car sig)
+                                          (cons 'lambda
                                                 (cons (cdr sig) E*))))
 
-;;; The following procedures are used during initialization.
-;;; They may duplicate DS-level functions to some extent.
+;;; The following procedures are used during initialization. They
+;;; may duplicate DS-level functions to some extent.
 
-;; Define variables specified in name-value-pairlist, in environment and store 
-;; specified by context-pair.  Uses specified defining-proc to support other 
-;; environment implementations (e.g. no global environment).
+;; Define variables specified in name-value-pairlist, in
+;; environment and store specified by context-pair. Uses specified
+;; defining-proc to support other environment implementations
+;; (e.g. no global environment).
 ;;
 ;; context-pair: (U . S)
 ;; name-value-pairlist: ((I . v)...)
@@ -186,19 +190,22 @@
 
 ;; Define variable in global environment
 ;;
-;; Does not extend provided environment - global environment is mutated instead.
+;; Does not extend provided environment - global environment is
+;; mutated instead.
 ;;
 ;; context-pair: (U . S)
 ;; name-value-pair: (I . v)
 ;;
-;; TODO! The second use of 'new' below doesn't conform to the DS behavior, in that it 
-;; uses the location of the variable holding the procedure as the procedure's unique 
-;; identifier.  This has the potential for failure in some real situations, but isn't 
-;; a problem in the current interpreter, especially since this function is only used
-;; during bootstrapping.
+;; TODO! The second use of 'new' below doesn't conform to the DS
+;; behavior, in that it uses the location of the variable holding
+;; the procedure as the procedure's unique identifier. This has
+;; the potential for failure in some real situations, but isn't a
+;; problem in the current interpreter, especially since this
+;; function is only used during bootstrapping.
 ;;
-;; TODO! This procedure is specific to procedure values, and can't define other types
-;; at present, due to use of (L x prox) format below.
+;; TODO! This procedure is specific to procedure values, and can't
+;; define other types at present, due to use of (L x prox) format
+;; below.
 ;;
 ;; todo: check ds kosherness
 ;; todo: handle allocation failure
@@ -209,10 +216,10 @@
          (v (cdr name-value-pair))
          (L (ds:new s)))
     (extend-global-environment! I L)
-    (cons r 
+    (cons r
           (ds:update L
-                     (ds:inject-value (ds:sequence 
-                                       (ds:project-location (ds:new s))  
+                     (ds:inject-value (ds:sequence
+                                       (ds:project-location (ds:new s))
                                        v))
                      s))))
 
