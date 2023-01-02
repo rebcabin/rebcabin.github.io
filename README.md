@@ -14,10 +14,8 @@
 
 - [PDF of Mathematica Notebook](https://github.com/rebcabin/rebcabin.github.io/blob/main/YCombinator005.pdf)
 
-## Lambda the Pynultimate Imperative
+## Algebraic Imperative Semantics, or, Lambda the Pynultimate Imperative
 
-- [Jupytext Notebook](https://github.com/rebcabin/rebcabin.github.io/blob/main/LambdaThePynultimateImperative004.ipynb)
+- [Jupytext Notebook](https://github.com/rebcabin/rebcabin.github.io/blob/main/AlgImperSem008.ipynb)
 
-- [Jupytext Markdown](https://github.com/rebcabin/rebcabin.github.io/blob/main/LambdaThePynultimateImperative004.md)
- 
- 
+- [Jupytext Markdown](https://github.com/rebcabin/rebcabin.github.io/blob/main/AlgImperSem008.md)
