@@ -25,7 +25,7 @@ or, Lambda, The Pynultimate Imperative
 **Brian Beckman**
 
 
-**30 Dec 2022**
+**16 Dec 2023**
 
 
 **[Creative Commons Attribution 4.0 International Public License](https://creativecommons.org/licenses/by/4.0/legalcode)**
@@ -40,14 +40,14 @@ In a classic paper, [_Lambda, the Ultimate Imperative_](https://www.researchgate
 > We demonstrate how to model the following common [imperative] programming constructs in ... an applicative-order language similar to LISP: Simple Recursion, Iteration, Compound Statements and Expressions, GO TO and Assignment, Continuation-Passing, Escape Expressions, Fluid Variables, Call by Name, Call by Need, and Call by Reference. The models require only (possibly self-referent) lambda application, conditionals, and (rarely) assignment.
 
 
-It's useful to recap this paper in Python, which has most of the listed imperative constructs. Imagine compiling Python into an intermediate language in which the semantics, even those with side-effects, are laid bare as trees of $\lambda$ expressions. In such a representation, optimizations are 
+It's useful to recap this paper in Python, which has most of the listed imperative constructs. Imagine compiling Python into an intermediate language in which the semantics, even those with side-effects, are laid bare as trees of $\lambda$ expressions. In such a representation, optimizations are
 1. easy to write as tree-to-tree transforms, in a closed algebra of expressions
 1. easy to extend via just function composition (even Kleisli-monadic)
 2. independent of surface syntax, thus easy to share with or decompile into other imperative languages like Fortran, C, Java
 3. independent of back ends, thus easy to run interactively; or to translate into LLVM, x86, ARM64, C, for execution; or to transpile into other surface languages
 
 
-The use-cases above are similar to those for a SQL algebraizer. Many SQL implementations 
+The use-cases above are similar to those for a SQL algebraizer. Many SQL implementations
 1. translate the surface language into bare-bones expressions in a closed relational algebra, free of original syntax
 2. run the algebraic expressions through symbolic optimizers, which often rearrange the expressions completely
 2. incrementally extend the system by composing new optimizations
@@ -84,7 +84,7 @@ The goal of this notebook is to transmit ideas from my mind to others. Most exam
 There is a companion Python project that `asserts` the results in pytest, proving the results in the computer. Unlike this notebook, that project is written in non-narrative style. The tests can be run in any order, largely independent of one another.
 
 
-Run the cells sequentially, in order. Some cells modify the unique global environment. Later cells may depend on earlier cells. 
+Run the cells sequentially, in order. Some cells modify the unique global environment. Later cells may depend on earlier cells.
 
 
 # PART I: BASICS<a id="basics"></a>
@@ -181,7 +181,7 @@ If the definitions above are acceptable, the apparent contradiction in SICP is r
 > __OBSERVATION__: A frame $\phi$ belongs to a sequence of environments implied by the unidirectional chain of enclosing environments ending at the unique global environment.
 
 
-> __DEFINITIONS__: The ___value of a variable in an environment___ is the value in the first binding in any frame of the sequence ending at _global_. Bindings lower in the chain may ___shadow___ bindings higher in the chain. If no frame in a chain has a binding for a variable, then the variable is ___unbound___ in the environment. A variable may be ___bound___ in one environment and unbound in another. 
+> __DEFINITIONS__: The ___value of a variable in an environment___ is the value in the first binding in any frame of the sequence ending at _global_. Bindings lower in the chain may ___shadow___ bindings higher in the chain. If no frame in a chain has a binding for a variable, then the variable is ___unbound___ in the environment. A variable may be ___bound___ in one environment and unbound in another.
 
 
 > __LEMMA__: A chain of environments implements a mathematical partial function from variable names to values. Shadowing ensures that any name appearing more than once in a chain has only one value when looked up.
@@ -231,9 +231,9 @@ class Environment:
 
     def _copy_trunk(self) -> "Environment":
         """Don't copy the global at the end, but do leave it
-        attached. WARNING: this does not return a _trunk_ 
-        because the global environment remains at the end. 
-        This avoids two traversals of the chain, once to 
+        attached. WARNING: this does not return a _trunk_
+        because the global environment remains at the end.
+        This avoids two traversals of the chain, once to
         remove the global and again to splice something in
         its place."""
         if self._is_global():
@@ -244,7 +244,7 @@ class Environment:
 
     def _splice_onto_lower(self, lower: "Environment"):
         """Splice self onto the end of lower._trunk(), which
-        does not have the global at its end. Self should either 
+        does not have the global at its end. Self should either
         be the global or have the global at its end.
 
         Purpose:
@@ -252,18 +252,18 @@ class Environment:
         parameters are looked up. 'Lower' comes from the
         prevailing env chain when a procedure is evaluated, i.e.,
         defined in some env like that established by LET_STAR.
-        'Lower' may contain bindings for free variables in the 
+        'Lower' may contain bindings for free variables in the
         body of the procedure.
 
         _splice_onto_lower is called iff 'self' comes from the
         explicit π parameter of a procedure constructor. 'Self'
         is global if the procedure has no parameters (i.e., no
-        non-free variables). This rule is not checked because 
+        non-free variables). This rule is not checked because
         it's ignored during testing.
 
         Aside:
         When a procedure with parameters is APPLY'd, a fresh
-        singleton env is consed on to 'self.' The fresh env 
+        singleton env is consed on to 'self.' The fresh env
         contains parameter bindings. When a procedure with no
         parameters is APPLY'd, no such env is consed on.
 
@@ -371,7 +371,7 @@ class Environment:
 # Unique Global Environment $\Gamma\Pi$<a id="global-environment"></a>
 
 
-The unique global environment is $\Gamma\Pi$, defined once for each session. The frame $\phi$, a Python object that ___carries___ attributes, is an empty function, namely `lambda: None`. 
+The unique global environment is $\Gamma\Pi$, defined once for each session. The frame $\phi$, a Python object that ___carries___ attributes, is an empty function, namely `lambda: None`.
 
 ```python
 ΓΠ = Environment(lambda: None, None)  # Γ for "global," Π for "environment"
@@ -394,10 +394,10 @@ setattr(ΓΠ.ϕ, 'γόὂ', 43)
 From SICP again:
 
 
-> __DEFINITIONS__: A ___procedure___ is a pair of _code_ and environment. 
+> __DEFINITIONS__: A ___procedure___ is a pair of _code_ and environment.
 
 
-The environment specifies the ___closure chain___ for the procedure. The closure chain is the chain of environments that contain [_free-variable bindings_](#free-variables), that is, bindings for non-parameters. 
+The environment specifies the ___closure chain___ for the procedure. The closure chain is the chain of environments that contain [_free-variable bindings_](#free-variables), that is, bindings for non-parameters.
 
 
 > __DEFINITION__: A ___closure___ is a procedure along with its closure chain of environments. All variables, free and bound, may be ___resolved___, that is, looked up, in the environment chain.
@@ -424,7 +424,7 @@ import math
 complex_from_polar(1.0, math.pi/4, math.sin, math.cos)
 ```
 
-Procedures are values, like numbers. Notionally, they are either 
+Procedures are values, like numbers. Notionally, they are either
 
 1. lookup tables from input values to output values, if they are pure functions, or
 
@@ -449,7 +449,7 @@ This definition sidesteps questions of _order of evaluation_. These questions in
 The following is an example of the (un-named) type of a **Code**, that is, a dictionary with a _body_ and a list of _formal parameters_.
 
 ```python
-{"body": lambda π: π.x + (2 * π.y), 
+{"body": lambda π: π.x + (2 * π.y),
  "parameters": ['x', 'y', 'z']};
 ```
 
@@ -500,7 +500,7 @@ Notice that the unused parameter `z` is nowhere to be seen. How do we know it's 
 To make all parameters, even [_ignored parameters_](#ignored-parameter) explicit, the body code is paired with a list of formal parameters.
 
 ```python
-{"body": lambda π: π.x + (2 * π.y), 
+{"body": lambda π: π.x + (2 * π.y),
  "parameters": ['x', 'y', 'z']};
 ```
 
@@ -519,7 +519,7 @@ Notice we gradually elide "formal parameters" and "actual arguments" to the shor
 ### Positional Arguments Only
 
 
-For now, unlike ordinary Python, Schemulator has only positional parameters, with the non-ignored ones 1-to-1 with arguments. That's consistent with [Gambit Scheme](https://github.com/gambit/gambit), which reports "Wrong number of arguments ..." if the call has too many or too few arguments. Since Schemulator should be semantically compatible with Scheme, it's OK to have positional parameters and arguments only. Likewise, Schemulator does not yet have Python's (admittedly wonderful) keyword arguments. 
+For now, unlike ordinary Python, Schemulator has only positional parameters, with the non-ignored ones 1-to-1 with arguments. That's consistent with [Gambit Scheme](https://github.com/gambit/gambit), which reports "Wrong number of arguments ..." if the call has too many or too few arguments. Since Schemulator should be semantically compatible with Scheme, it's OK to have positional parameters and arguments only. Likewise, Schemulator does not yet have Python's (admittedly wonderful) keyword arguments.
 
 
 ## Anonymous versus Named
@@ -554,7 +554,7 @@ The definition of `Procedure` again illustrates codependent types. `Procedure`'s
 from typing import Dict, List, Tuple, Any, Union
 Parameters = List[str]  # type synonym; positional, ordered arguments only
 def APPLY(proc: "Procedure",  # <~~~ in quotes because it's not defined yet.
-          args: Union[List["Expression"], None], 
+          args: Union[List["Expression"], None],
           π: Environment = ΓΠ) -> Any:  # defaults to global
     """forward reference; will be corrected. Needed to
     spec Procedure."""
@@ -611,7 +611,7 @@ Test it! Remember, `APPLY`, for now, just prints the arguments of the applied pr
 Test detection of duplicate parameters:
 
 ```python
-try: 
+try:
     setattr(
         ΓΠ.ϕ,
         "square",
@@ -664,7 +664,7 @@ def Λ(
         π = ΓΠ            # default global
 ) -> Procedure:
     ρ = Procedure(
-        code={"body": body, 
+        code={"body": body,
               "parameters": parameters or []},
         π=π)
     return ρ
@@ -697,10 +697,10 @@ setattr(  # Give a name ...
 Do not confuse this [_Application_](#application), capital "A", with _application_, little "a", meaning a call or invocation of a procedure. An _Application_ with capital "A" is inert data representing a procedure call, invocation, or application. We test it later, after [`EVAL`](#eval) and [`APPLY`](#apply) are fully defined.
 
 
-`Application` is needed in [LET_STAR](#let-star) and related constructs to delay evaluation until the environment with parameter bindings is established, where [EVAL](#eval) can look them up by name. 
+`Application` is needed in [LET_STAR](#let-star) and related constructs to delay evaluation until the environment with parameter bindings is established, where [EVAL](#eval) can look them up by name.
 
 
-`Application` is a placeholder for a more general [QUOTE](#quote) or macro mechanism, which prevents evaluation in all cases (TODO). In real Scheme, `LET` and friends are syntactical forms that delay evaluation via Scheme macros, i.e., code rewriters. We prefer explicit delaying via `Application` objects here at the semantical level, so as not to obscure the algebraic structures we pursue. TODO: there may be observble differences between Scheme and this Schemulator if Scheme delays the evaluation of arguments, not just the application of the procedure. 
+`Application` is a placeholder for a more general [QUOTE](#quote) or macro mechanism, which prevents evaluation in all cases (TODO). In real Scheme, `LET` and friends are syntactical forms that delay evaluation via Scheme macros, i.e., code rewriters. We prefer explicit delaying via `Application` objects here at the semantical level, so as not to obscure the algebraic structures we pursue. TODO: there may be observble differences between Scheme and this Schemulator if Scheme delays the evaluation of arguments, not just the application of the procedure.
 
 
 An alternative is an embedded macro DSL (Domain-Specific Language) in Python, overkill here. If we go down that road, we might as well just implement Scheme altogether.
@@ -711,7 +711,7 @@ An alternative is an embedded macro DSL (Domain-Specific Language) in Python, ov
 ```python
 from typing import Union, Any
 def EVAL_APPLICATION(
-        expr: "Application", 
+        expr: "Application",
         π: Environment = ΓΠ
 ) -> Any:
     """forward reference; corrected below"""
@@ -732,7 +732,7 @@ class Application:
             'args': self.args,
             'π': self.π if self.π.π else "ΓΠ"
             })
-        return result        
+        return result
 ```
 
 ## Shortcut: $\Xi$(head, args, $\pi$)
@@ -776,8 +776,8 @@ To evaluate an [`Application`](#application), evaluate the procedure or string (
 
 ```python
 def EVAL(
-        expr: Any, 
-        π: Environment = ΓΠ, 
+        expr: Any,
+        π: Environment = ΓΠ,
         tag=None
 ) -> Any:
     """forward reference, corrected below."""
@@ -786,7 +786,7 @@ def EVAL_APPLICATION(
         expr: Application,
         π: Environment = ΓΠ
 ) -> Any:
-    """corrected definition; Treats 'head' a free variable in 
+    """corrected definition; Treats 'head' a free variable in
     an expression to recursively evaluate."""
     if isinstance(expr.head, str):  # 'head' is implicitly a Var.
         # 1/4. Evaluate first slot to find proc from string ...
@@ -1054,7 +1054,7 @@ Test the [Greek](#greek) shortcut $\Xi$ for `Application`, now treating the stri
 Without the `Var`, `EVAL` treats `'γόὂ'` as a Python string, producing a `TypeError`:
 
 ```python
-try: 
+try:
     EVAL(Ξ('square',  # find proc in global env
            ['γόὂ']))  # get horribly confused
 except TypeError as e:
@@ -1073,7 +1073,7 @@ Scheme equivalent (Scheme doesn't need `Var`, [though Clojure has it](https://cl
 
 ```python
 EVAL(
-    Ξ(Λ(lambda π: π.x * π.x, ['x']), 
+    Ξ(Λ(lambda π: π.x * π.x, ['x']),
       [Var('γόὂ')]  # find binding in global env
      ))
 ```
@@ -1103,8 +1103,8 @@ $\phi\omicron\omicron\beta\alpha\rho$ is not bound in the $\pi$ of the $\Lambda$
 try:
     Λ(lambda π:
       EVAL(
-          Ξ('square', 
-            [Var('ϕοοβαρ')]), 
+          Ξ('square',
+            [Var('ϕοοβαρ')]),
           ΓΠ),  # <~~~ wrong env
       ['ϕοοβαρ'])(
         42)
@@ -1118,7 +1118,7 @@ $\Gamma\Pi$ is the default of `EVAL`:
 try:
     Λ(lambda π:
       EVAL(
-          Ξ('square', 
+          Ξ('square',
             [Var('ϕοοβαρ')])),  # <~~~ no env means ΓΠ
       ['ϕοοβαρ'])(
         42)
@@ -1160,8 +1160,8 @@ By default, `DEFINE` binds symbols in $\Gamma\Pi$. The "return value" is consist
 
 ```python
 def DEFINE(
-        sym: str, 
-        val: Any, 
+        sym: str,
+        val: Any,
         π: Environment=ΓΠ  # default
 ) -> None:
     """official Scheme"""
@@ -1183,14 +1183,14 @@ import numpy
 
 ```python
 DEFINE(
-    'saxpy', 
-    Λ(lambda π: 
+    'saxpy',
+    Λ(lambda π:
       # Fancy!
       numpy.dot(π.a, π.x) \
-      if isinstance(π.a, numpy.ndarray) 
+      if isinstance(π.a, numpy.ndarray)
       and isinstance (π.x, numpy.ndarray) \
       # Regular
-      else π.a * π.x + π.y, 
+      else π.a * π.x + π.y,
       ['a', 'x', 'y']));
 ```
 
@@ -1210,7 +1210,7 @@ or just some ordinary stuff:
 ## SICP 3.2.2<a id="sicp-322"></a>
 
 ```python
-DEFINE('square', 
+DEFINE('square',
        Λ(lambda π: π.x * π.x, ['x']))
 
 DEFINE('sum_of_squares',
@@ -1325,10 +1325,10 @@ Scheme _automatically_ chains environments into static closures, in which free v
 1764
 <!-- #endraw -->
 
-How do we emulate this? Schemulator requires an explicit chaining parameter because Schemulator does not know there are free variables in the body of the $\Lambda$. Schemulator does not know because Schemulator does not parse, on purpose, [as explained in the introduction](#semantics). If Schemulator were Scheme, and thus parsing, it could determine that free variables occur in the body and then it could automatically chain environments. 
+How do we emulate this? Schemulator requires an explicit chaining parameter because Schemulator does not know there are free variables in the body of the $\Lambda$. Schemulator does not know because Schemulator does not parse, on purpose, [as explained in the introduction](#semantics). If Schemulator were Scheme, and thus parsing, it could determine that free variables occur in the body and then it could automatically chain environments.
 
 
-Schemulator forces the user to write environments, on purpose. 
+Schemulator forces the user to write environments, on purpose.
 
 
 Here's the example above in Schemulator:
@@ -1357,7 +1357,7 @@ Here's a Scheme example that, when called, returns a closure, that is, in-turn, 
 1764
 <!-- #endraw -->
 
-Here's the same example in Schemulator. The outer procedure doesn't _call_ the inner closure, but returns it. 
+Here's the same example in Schemulator. The outer procedure doesn't _call_ the inner closure, but returns it.
 
 ```python
 Λ(lambda E1:
@@ -1444,9 +1444,9 @@ Gambit Scheme does not support dynamic closures, i.e., evaluating procedures in 
 If we do both, defining _and_ evaluating the inner $\lambda$ in E1, we get only one copy of E1 containing `m`. Dynamic splicing in [`Environment`](#environment) checks this case and optimizes it away:
 
 ```python
-Λ(lambda E1:        
+Λ(lambda E1:
   EVAL(        # EVAL the inner procedure itself ....
-      Λ(lambda E2:  
+      Λ(lambda E2:
         E2.n * ECHO('E2', E2).m,  # <~~~ n and m are Found in E2 by chaining ...
         ['n'],                    #      ... but n is not Bound in E2.
         E1     # DIFFERENT: !!!! explicitly defined in outer E1
@@ -1461,7 +1461,7 @@ There is no Scheme equivalent.
 ## Shadowing
 
 
-Because the two variables `m` and `n` are in different environments, they can have the same name. `E2.n` (value 42) ___shadows___ `E1.n` (value 43), meaning that `E1.n` is inaccessible from `E2`. 
+Because the two variables `m` and `n` are in different environments, they can have the same name. `E2.n` (value 42) ___shadows___ `E1.n` (value 43), meaning that `E1.n` is inaccessible from `E2`.
 
 ```python
 Λ(lambda E1:
@@ -1494,7 +1494,7 @@ The same happens, even when we explicitly chain environments. See by inspecting 
 Λ(lambda E1:
   Λ(lambda E2:
     E2.n * ECHO('E2.n', ECHO('E2', E2).n),
-    ['n'], 
+    ['n'],
    ECHO('E1', E1)),
   ['n'])(43)(42)
 ```
@@ -1539,7 +1539,7 @@ Scheme equivalents:
 > __DEFINITION__: A ___thunk___ is a procedure of no arguments.
 
 
-> __DEFINITION__: A ___1-thunk___ is a procedure of one argument. 
+> __DEFINITION__: A ___1-thunk___ is a procedure of one argument.
 
 
 > __DEFINITION__: A ___curried___ function is a procedure of many arguments transformed into a composition of 1-thunks.
@@ -1564,9 +1564,9 @@ Here are these examples in Schemulator.
 ```
 
 ```python
-Λ(lambda πo: 
-  Λ(lambda πi: πi.x + πi.y**2, 
-    ['y'], 
+Λ(lambda πo:
+  Λ(lambda πi: πi.x + πi.y**2,
+    ['y'],
     πo),  # <~~~ explicit chaining
   ['x'])(43)(42)
 ```
@@ -1577,7 +1577,7 @@ Notice that `x` occurs [free](#free-variables) in the inner $\lambda$ but [bound
 The name "curried" comes from Haskell Curry, who developed the theory of analyzing all functions as 1-thunks. Haskell Curry also gave his name to the World's most prominent pure functional programming language, Haskell.
 
 
-In many examples below, we will work with curried functions, but eventually leave them behind because they're often less than intuitive and they are mathematically isomorphic to non-curried forms. 
+In many examples below, we will work with curried functions, but eventually leave them behind because they're often less than intuitive and they are mathematically isomorphic to non-curried forms.
 
 <!-- #region tags=[] -->
 # $\Upsilon$: Squaring Square Roots of Functions
@@ -1596,14 +1596,14 @@ Don't forget non-default `πsf` on the inner definition, lest `sf` be unbound in
 
 ```python
 Λ(lambda πsf:  # <~~~ Apply this Λ ...
-  Λ(lambda πn: 
+  Λ(lambda πn:
     # Observe the "multiplication" sf(sf):
-    1 if πn.n < 1 else πn.n * πn.sf(πn.sf)(πn.n - 1), 
+    1 if πn.n < 1 else πn.n * πn.sf(πn.sf)(πn.n - 1),
     ['n'], πsf),  # <~~~ Don't forget!
   ['sf'])(  # <~~~ ... to a copy of itself.
     Λ(lambda πsf:  # <~~~ bind this Λ to upper 'sf'
-      Λ(lambda πn: 
-        1 if πn.n < 1 else πn.n * πn.sf(πn.sf)(πn.n - 1), 
+      Λ(lambda πn:
+        1 if πn.n < 1 else πn.n * πn.sf(πn.sf)(πn.n - 1),
         ['n'], πsf),   # <~~~ Don't forget!
       ['sf']))(6)
 ```
@@ -1630,22 +1630,22 @@ Abstract `sf(sf)(m)` into a `f`, a delayed $\lambda$ of `m`. That means "replace
 Λ(lambda πsf:
   Λ(lambda πf:  # Domain code d is a function of business code f.
     Λ(lambda πn:  # Business code f is a function of business parameter n.
-      1 if πn.n < 1 else πn.n * πn.f(πn.n - 1), 
-      ['n'], πf), 
+      1 if πn.n < 1 else πn.n * πn.f(πn.n - 1),
+      ['n'], πf),
     ['f'], πsf)(
       Λ(lambda πm:  # Delayed application of business code f = sf(sf).
-        πm.sf(πm.sf)(ECHO('πm', πm).m), 
-        ['m'], πsf)), 
+        πm.sf(πm.sf)(ECHO('πm', πm).m),
+        ['m'], πsf)),
   ['sf'])(  # <~~~ Apply to copy of self:
 Λ(lambda πsf:
   Λ(lambda πf:  # Domain code d is a function of business code f.
     Λ(lambda πn:  # Business code f is a function of business parameter n.
-      1 if πn.n < 1 else πn.n * πn.f(πn.n - 1), 
-      ['n'], πf), 
+      1 if πn.n < 1 else πn.n * πn.f(πn.n - 1),
+      ['n'], πf),
     ['f'], πsf)(
       Λ(lambda πm:  # Delayed application of business code f = sf(sf).
-        πm.sf(πm.sf)(πm.m), 
-        ['m'], πsf)), 
+        πm.sf(πm.sf)(πm.m),
+        ['m'], πsf)),
   ['sf']))(6)
 ```
 
@@ -1669,7 +1669,7 @@ Scheme equivalent:
  6)
 <!-- #endraw -->
 
-Abstract the ___domain code___ into `d`, a function of the ___business code___ `f`, which, in-turn, is a function of the ___business parameter___ `n`, then involute $\lambda(d)$ and $\lambda(\sqrt{f})$ to bring $\lambda(d)$ outward. Notice that the domain code is isolated and no longer duplicated. 
+Abstract the ___domain code___ into `d`, a function of the ___business code___ `f`, which, in-turn, is a function of the ___business parameter___ `n`, then involute $\lambda(d)$ and $\lambda(\sqrt{f})$ to bring $\lambda(d)$ outward. Notice that the domain code is isolated and no longer duplicated.
 
 
 The two steps are broken out in the Scheme equivalents. The Schemulator code below is the result of the second, involuation step:
@@ -1681,13 +1681,13 @@ The two steps are broken out in the Scheme equivalents. The Schemulator code bel
           ['m'], πsf)),
     ['sf'], πd)(  # <~~~ "squaring," i.e., self-application
       Λ(lambda πsf:  # sf; .... right here
-        πd.d(Λ(lambda πm: πm.sf(πm.sf)(πm.m), 
+        πd.d(Λ(lambda πm: πm.sf(πm.sf)(πm.m),
               ['m'], πsf)),
-        ['sf'], πd)), 
+        ['sf'], πd)),
   ['d'])(  # d is the formal parameter for domain code
     Λ(lambda πf:  # Domain code d is a function of business code f.
       Λ(lambda πn:  # Business code f is a function of business parameter n.
-        1 if πn.n < 1 else πn.n * πn.f(πn.n - 1), 
+        1 if πn.n < 1 else πn.n * πn.f(πn.n - 1),
         ['n'], πf),  # n: business parameter
       ['f'])  # square of sf, recursive function
     )(6)
@@ -1736,12 +1736,12 @@ Remove the duplication of the squaring code; abstract it (the self-application) 
 
 ```python
 Λ(lambda πd:  # function of domain code, d
-  Λ(lambda πg:  # generic squaring gizmo 
+  Λ(lambda πg:  # generic squaring gizmo
     πg.g(πg.g), ['g'], πd)(
-      Λ(lambda πsf: 
-        πd.d(Λ(lambda πm: πm.sf(πm.sf)(πm.m), 
+      Λ(lambda πsf:
+        πd.d(Λ(lambda πm: πm.sf(πm.sf)(πm.m),
                ['m'], πsf)),
-        ['sf'], πd)), 
+        ['sf'], πd)),
   ['d'])(  # formal parameter d for domain code
     Λ(lambda πf:  # Domain code d is a function of business code f.
       Λ(lambda πn:  # Business code f is a function of business parameter n.
@@ -1770,21 +1770,21 @@ Scheme equivalent:
 ## Recursivion via $\Upsilon{}1$
 
 
-Now we can see that the function of domain code `d` is generic. Let's call it $\Upsilon$1 and define it in the global environment. The "1" in the name means that $\Upsilon{}1$ takes domain codes that return [1-thunk](#thunk) business codes, i.e., business codes of one parameter. 
+Now we can see that the function of domain code `d` is generic. Let's call it $\Upsilon$1 and define it in the global environment. The "1" in the name means that $\Upsilon{}1$ takes domain codes that return [1-thunk](#thunk) business codes, i.e., business codes of one parameter.
 
 
 The glyph that looks like "Y" is actually capital Upsilon ($\Upsilon$ in $\LaTeX$). To enter it in the notebook, keyboard `\Upsilon` and then `[tab]`. Names in user code should not collide with it if users remember to [avoid Greek](#greek).
 
 ```python
-DEFINE('Υ1', 
+DEFINE('Υ1',
        Λ(lambda πd: # Υ1 is function of domain code, d.
-         # d is a function of business code f, that 
-         # returns new business code that can refer to f. 
+         # d is a function of business code f, that
+         # returns new business code that can refer to f.
          Λ(lambda πg: πg.g(πg.g), ['g'], πd)(  # λ(g) applied to ...
              Λ(lambda πsf:  # generic square root.
-               πd.d(Λ(lambda πm: πm.sf(πm.sf)(πm.m), 
+               πd.d(Λ(lambda πm: πm.sf(πm.sf)(πm.m),
                       ['m'], πsf)),
-               ['sf'], πd)), 
+               ['sf'], πd)),
          ['d']))
 ```
 
@@ -1828,16 +1828,16 @@ Scheme equivalent:
 $\Upsilon$ can be tailored for a given number of business parameters. This one is for three.
 
 ```python
-# λ d: (λ g: g[g])(λ sf: d[λ m, c, x: sf[sf][m, c, x]]) 
-DEFINE('Υ3', 
+# λ d: (λ g: g[g])(λ sf: d[λ m, c, x: sf[sf][m, c, x]])
+DEFINE('Υ3',
        Λ(lambda πd:  # of d, the domain code ...
          Λ(lambda πg: πg.g(πg.g), ['g'], πd)(
              # ... of business code of three parameters
              Λ(lambda πsf: πd.d(  # domain code
-                 Λ(lambda π: 
+                 Λ(lambda π:
                    π.sf(π.sf)(π.μ, π.γ, π.ξ),  # business code
                    ['μ', 'γ', 'ξ'], πsf)),  # business parameters
-               ['sf'], πd)), 
+               ['sf'], πd)),
          ['d']));
 ```
 
@@ -1867,9 +1867,9 @@ Here is user-level domain code, redefining `fact_iter` in domain-code form. Any 
 # λ f: λ m, c, x: m if c > x else f(m*c, c+1, x)
 DEFINE('fact_iter', # domain code is a function of f ...
        Λ(lambda π: # ... which is business code.
-         Λ(lambda π: 
-           π.m 
-           if π.c > π.x 
+         Λ(lambda π:
+           π.m
+           if π.c > π.x
            else π.f(π.m * π.c, π.c + 1, π.x), # business code
            ['m', 'c', 'x'], π), # business parameters
          ['f']));
@@ -1922,13 +1922,13 @@ The glyph that looks like "P" below is Greek Capital Rho for "recur." Names in u
 > __WARNING__: ***Results are undefined if any `LOOP` function is called with non-tail-recursive domain code.***
 
 ```python
-class TailCall(Exception):  
+class TailCall(Exception):
     """αναδρομική κλήση"""
     def __init__(self, *args):
         """Overwrite old args with new."""
         self.args = args
 
-def RECUR(*args):  
+def RECUR(*args):
     """υψώνω: in sincere flattery of Clojure"""
     raise TailCall(*args)
 
@@ -1939,7 +1939,7 @@ def LOOP3(d: Procedure) -> Procedure:  # domain code
     def looper(*args):
         """Expression form of a while-loop statement."""
         while True:
-            try: 
+            try:
                 return d(ΓΠ.Ρ3)(*args)
             except TailCall as e:
                 args = e.args
@@ -2024,9 +2024,9 @@ except RecursionError as e:
 Write domain code for catastropically slow, non-tail-recursive, exponentially diverging Fibonacci:
 
 ```python
-DEFINE('fib_slow', 
-       Λ(lambda π: 
-         Λ(lambda π: 1 if π.n < 2 else 
+DEFINE('fib_slow',
+       Λ(lambda π:
+         Λ(lambda π: 1 if π.n < 2 else
            π.f(π.n - 1) + π.f(π.n - 2), ['n'], π),
          ['f']))
 
@@ -2053,7 +2053,7 @@ Tail-recursive memoization is possible but not necessary. A tail-recursive Fibon
 ```python
 DEFINE('fib_iter',
        Λ(lambda π:
-         Λ(lambda π: π.b if π.n < 1 else 
+         Λ(lambda π: π.b if π.n < 1 else
            π.f(π.b, π.a + π.b, π.n - 1),
            ['a', 'b', 'n'], π),
          ['f']));
@@ -2093,15 +2093,15 @@ Linearize execution of Fibonacci by recording intermediate results in a memo tab
 One way to pass a memo table is through a Curried second argument. We'll need $\Upsilon2C$, generic for 2-parameter, Curried business code:
 
 ```python
-DEFINE('Υ2C', 
+DEFINE('Υ2C',
        Λ(lambda π: # function of domain code, d ...
          Λ(lambda π: π.g(π.g), ['g'], π)(
              # with business code of 2 parameters, curried
-             Λ(lambda π: 
-               π.d(Λ(lambda π: 
-                     Λ(lambda π: π.sf(π.sf)(π.m)(π.n), 
+             Λ(lambda π:
+               π.d(Λ(lambda π:
+                     Λ(lambda π: π.sf(π.sf)(π.m)(π.n),
                        ['n'], π), ['m'], π)),
-               ['sf'], π)), 
+               ['sf'], π)),
          ['d']));
 ```
 
@@ -2125,7 +2125,7 @@ DEFINE('fib_fast',
                      Λ(lambda πa1: # of a1; level 8
                        Λ(lambda πn2: # of n_2; level 9
                          (πn2.a1, πn2.r1 + πn2.a1[πn2.n_2]) # <~~~ a quick exit
-                         if πn2.n_2 in πn2.a1 else 
+                         if πn2.n_2 in πn2.a1 else
                          Λ(lambda πfim2: # of fim2; level 10
                            Λ(lambda πm2: # of m2; level 11
                              Λ(lambda πr2: # of r2; level 12
@@ -2143,7 +2143,7 @@ DEFINE('fib_fast',
                ['n_1'], πn)(πn.n - 1), # DRY
              ['n'], πa), # business parameter
            ['a'], πf), # curried memo
-         ['f'])) # domain code 
+         ['f'])) # domain code
 ΓΠ.Υ2C(ΓΠ.fib_fast)({})(23)[1]
 ```
 
@@ -2182,7 +2182,7 @@ DEFINE('fib_fast_uncurried',
                   Λ(lambda π: # of a1; level 7
                     Λ(lambda π: # of n_2; level 8
                       (π.a1, π.r1 + π.a1[π.n_2]) # <~~~ quick exit
-                      if π.n_2 in π.a1 else 
+                      if π.n_2 in π.a1 else
                       Λ(lambda π: # of t_2; level 9
                         Λ(lambda π: # of m_2; level 10
                           Λ(lambda π: # of r_2; level 11
@@ -2205,14 +2205,14 @@ DEFINE('fib_fast_uncurried',
 Now need only an ordinary $\Upsilon2$ to call it:
 
 ```python
-DEFINE('Υ2', 
+DEFINE('Υ2',
        Λ(lambda π: # of d, the domain code ...
          Λ(lambda π: π.g(π.g), ['g'], π)(
              # of business code of two parameters
-             Λ(lambda π: 
-               π.d(Λ(lambda π: π.sf(π.sf)(π.m, π.c), 
-                     ['m', 'c'], π)), 
-               ['sf'], π)), 
+             Λ(lambda π:
+               π.d(Λ(lambda π: π.sf(π.sf)(π.m, π.c),
+                     ['m', 'c'], π)),
+               ['sf'], π)),
          ['d']));
 ```
 
@@ -2286,27 +2286,27 @@ f(r1, r2, a, n, x):
 ### Non-Tail-Recursive
 
 ```python
-DEFINE('Υ5', 
+DEFINE('Υ5',
        Λ(lambda π: # of d, the domain code ...
          Λ(lambda π: π.g(π.g), ['g'], π)(
              # of business code of five parameters
              Λ(lambda π: π.d(
-                 Λ(lambda π: π.sf(π.sf)(π.m, π.c, π.x, π.a, π.b), 
-                   ['m', 'c', 'x', 'a', 'b'], π)), 
-               ['sf'], π)), 
+                 Λ(lambda π: π.sf(π.sf)(π.m, π.c, π.x, π.a, π.b),
+                   ['m', 'c', 'x', 'a', 'b'], π)),
+               ['sf'], π)),
          ['d']));
 ```
 
 ```python
 DEFINE('fib_tc_memo',
-      Λ(lambda π: 
+      Λ(lambda π:
         Λ(lambda π:
           (π.a | {π.x: π.r2}, π.r2) if π.n < 1 else \
-          π.f(π.r2, π.r1 + π.r2, 
+          π.f(π.r2, π.r1 + π.r2,
               π.a | {π.x-π.n: π.r2},
               π.n - 1,
               π.x),
-         ['r1', 'r2', 'a', 'n', 'x'], π), 
+         ['r1', 'r2', 'a', 'n', 'x'], π),
         ['f']));
 ```
 
@@ -2321,18 +2321,18 @@ DEFINE('fib_tc_memo',
 ```python
 def LOOP5(d: Procedure) -> Procedure:
     """in sincere flattery of Clojure, and thanks to Thomas Baruchel."""
-    DEFINE('Ρ5', Λ(lambda π: 
-                   RECUR(π.m, π.c, π.x, π.a, π.b), 
+    DEFINE('Ρ5', Λ(lambda π:
+                   RECUR(π.m, π.c, π.x, π.a, π.b),
                    ['m', 'c', 'x', 'a', 'b']));
     def looper(*args):
         """Expression form of a while-loop statement."""
         while True:
-            try: 
+            try:
                 return d(ΓΠ.Ρ5)(*args)
             except TailCall as e:
                 args = e.args
-    ρ = Λ(lambda π: 
-               looper(π.m, π.c, π.x, π.a, π.b), 
+    ρ = Λ(lambda π:
+               looper(π.m, π.c, π.x, π.a, π.b),
                ['m', 'c', 'x', 'a', 'b'], π=d.π)
     return ρ
 ```
@@ -2347,7 +2347,7 @@ LOOP5(ΓΠ.fib_tc_memo)(0, 1, {}, 23, 23)
 try:
     print(ΓΠ.Υ5(ΓΠ.fib_tc_memo)(0, 1, {}, 500, 500)[1])
 except RecursionError as e:
-    print(e.args)    
+    print(e.args)
 ```
 
 ```python
@@ -2365,7 +2365,7 @@ We finish off [PART 1: BASICS](#basics) with straightforward generalizations of 
 
 ```python
 def LOOPN(
-        d: Procedure, 
+        d: Procedure,
         vars_: List[str]  # <~~~ NOTA BENE, extra parameters to LOOPN
 ) -> Procedure:
     """in sincere flattery of Clojure, and thanks to Thomas Baruchel."""
@@ -2455,8 +2455,8 @@ Tested below in [BLOCK](#block). Like Gambit, we can only `set!` symbols that ar
 
 ```python
 def SET_BANG(
-        sym: str, 
-        val: Any, 
+        sym: str,
+        val: Any,
         π: Environment = ΓΠ
 ) -> None:
     ee = EVAL(val, π)
@@ -2505,7 +2505,7 @@ This block first sets `x` in $\Gamma\Pi$ to 6 and then accesses that variable:
 ```python
 DEFINE('x', 0)  # <~~~ Binding must preexist in ΓΠ for SET_BANG
 BLOCK(
-    Λ(lambda π: SET_BANG('x', 6, π)), 
+    Λ(lambda π: SET_BANG('x', 6, π)),
     Λ(lambda π: π.x * 7))
 ```
 
@@ -2538,7 +2538,7 @@ Scheme equivalent:
 ```python
 DEFINE('y', 42)  # <~~~ in ΓΠ
 BLOCK(
-    Λ(lambda π: SET_BANG('x', 6, π)), 
+    Λ(lambda π: SET_BANG('x', 6, π)),
     Λ(lambda π: SET_BANG('x', π.x * 7, π)),
     Λ(lambda π: π.x * π.y))
 ```
@@ -2572,7 +2572,7 @@ Check for unbound variables.
 ```python
 try:
     BLOCK(
-        Λ(lambda π: SET_BANG('x', 6, π)), 
+        Λ(lambda π: SET_BANG('x', 6, π)),
         Λ(lambda π: SET_BANG('x', π.x * 7, π)),
         Λ(lambda π: print({'expect 1764': π.x * π.y})),
         Λ(lambda π: π.z))  # <~~~ no binding
@@ -2648,7 +2648,7 @@ try:
     ΓΠ.x1
 except NameError as e:
     print(e.args)
-    
+
 try:
     ΓΠ.y1
 except NameError as e:
@@ -2675,7 +2675,7 @@ Check that intermediate lambdas that don't return `None` are NOT a problem:
 
 ```python
 BLOCK(
-    Λ(lambda π: SET_BANG('x', 6, π)), 
+    Λ(lambda π: SET_BANG('x', 6, π)),
     Λ(lambda π: SET_BANG('x', π.x * 7, π)),
     Λ(lambda π: π.x * π.y),
     Λ(lambda π: π.x * π.y))
@@ -2685,7 +2685,7 @@ Check nested `BLOCK`s. Don't forget to wrap the nested `BLOCK` in a [thunk](#thu
 
 ```python
 BLOCK(
-    Λ(lambda π: SET_BANG('x', 6, ECHO('π', π))), 
+    Λ(lambda π: SET_BANG('x', 6, ECHO('π', π))),
     Λ(lambda π:  # <~~~ Don't forget to wrap it!
       BLOCK(Λ(lambda π: SET_BANG('x', π.x * 7, π)),
             Λ(lambda π: π.x * π.y))))
@@ -2742,7 +2742,7 @@ Remember that $\Xi$ is a [Greek](#greek) shortcut for [`Application`](#applicati
 ```python
 def LET_STAR(
         binding_pairs: List[Tuple[str, Expression]],
-        body: Expression, 
+        body: Expression,
         π: Environment = ΓΠ
 ) -> Any:
     if len(binding_pairs) == 0:  # <~~~ Empty bindings are allowed.
@@ -2763,7 +2763,7 @@ def LET_STAR(
 Test depth 0, no bindings. The final expression -- the returned value -- can be a `Procedure`:
 
 ```python
-LET_STAR([], 
+LET_STAR([],
          Λ(lambda π: 43 * π.x, ['x']))
 ```
 
@@ -2776,7 +2776,7 @@ lambda x: 43 * x
 Which can be called:
 
 ```python
-LET_STAR([], 
+LET_STAR([],
          Λ(lambda π: 43 * π.x, ['x']))(42)
 ```
 
@@ -2789,7 +2789,7 @@ Python equivalent:
 Applications are evaluated in place:
 
 ```python
-LET_STAR([], 
+LET_STAR([],
          Ξ(Λ(lambda π: 43 * 42)))
 ```
 
@@ -2885,7 +2885,7 @@ def γ009():
 Test depth 1 (don't forget the `Var` in $\Xi$:
 
 ```python
-LET_STAR([('z', 42)], 
+LET_STAR([('z', 42)],
          Ξ(ΓΠ.square, [Var('z')]))
 ```
 
@@ -2897,7 +2897,7 @@ def square(x):
     return ρ
 def γ010():
     z = 42
-    ρ = square(eval('z')) 
+    ρ = square(eval('z'))
     return ρ
 γ010()
 ```
@@ -2914,8 +2914,8 @@ def γ010():
 Test depth 2 with free variables:
 
 ```python
-LET_STAR([('z', 42), 
-          ('y', 43)], 
+LET_STAR([('z', 42),
+          ('y', 43)],
          Ξ(Λ(lambda π: π.z * π.y)))
 ```
 
@@ -2937,16 +2937,16 @@ def γ011():  # <~~~ Environment here will have all bindings.
 Inspect bindings with an `ECHO` around the environment variable:
 
 ```python
-LET_STAR([('z', 42), 
-          ('y', 43)], 
+LET_STAR([('z', 42),
+          ('y', 43)],
          Ξ(Λ(lambda π: ECHO('π', π).z * π.y)))
 ```
 
 Test depth 3 with free varialbes:
 
 ```python
-LET_STAR([('z', 42), 
-          ('y', Ξ(Λ(lambda π: π.z + 1))), 
+LET_STAR([('z', 42),
+          ('y', Ξ(Λ(lambda π: π.z + 1))),
           ('w', Ξ(Λ(lambda π: π.z * π.y)))],
          body=Ξ(Λ(lambda π: ECHO('π', π).w)))
 ```
@@ -2989,13 +2989,13 @@ Remember that [this definition of bound variables is confusing](#confusing).
 Test depth 3 with bound variables. To access earlier bindings, write an [`Application` or $\Xi$](#application) that, when evaluated, [accesses earlier bindings as `Var`s](#var). Notice the bound vars shadow free vars with the same names.
 
 ```python
-LET_STAR([('z', 42), 
+LET_STAR([('z', 42),
           ('y', Ξ(Λ(lambda π: π.z + 1, ['z']),  # <~~~ z shadows ...
                   [Var('z')])),  # <~~~ ... this Var.
           # Shadowing occurs here, too.
-          ('w', Ξ(Λ(lambda π: ECHO('π', π).z * π.y, ['z', 'y']), 
+          ('w', Ξ(Λ(lambda π: ECHO('π', π).z * π.y, ['z', 'y']),
                   [Var('z'), Var('y')])
-          )], 
+          )],
          body=Ξ(Λ(lambda π0: ECHO('π0', π0).w)))
 ```
 
@@ -3022,13 +3022,13 @@ def γ016():
 The names of the bound variables do not matter. In this case, we avoid shadowing, so the names `z`, `y`, and `w` are available in the body of `w`'s procedure:
 
 ```python
-LET_STAR([('z', 42), 
+LET_STAR([('z', 42),
           ('y', Ξ(Λ(lambda π: π.zz + 1, ['zz']),
-                  [Var('z')])), 
+                  [Var('z')])),
           # Use parameters:
-          ('w', Ξ(Λ(lambda π: ECHO('π', π).zzz * π.yy, ['zzz', 'yy']), 
+          ('w', Ξ(Λ(lambda π: ECHO('π', π).zzz * π.yy, ['zzz', 'yy']),
                   [Var('z'), Var('y')])
-          )], 
+          )],
          body=Ξ(Λ(lambda π: π.w)))
 ```
 
@@ -3055,13 +3055,13 @@ def γ019():
 Ignore parameters; use free variables:
 
 ```python
-LET_STAR([('z', 42), 
+LET_STAR([('z', 42),
           ('y', Ξ(Λ(lambda π: π.zz + 1, ['zz']),
-                  [Var('z')])), 
+                  [Var('z')])),
           # Ignore parameters; use free variables:
-          ('w', Ξ(Λ(lambda π: ECHO('π', π).z * π.y, ['zzz', 'yy']), 
+          ('w', Ξ(Λ(lambda π: ECHO('π', π).z * π.y, ['zzz', 'yy']),
                   [Var('z'), Var('y')])
-          )], 
+          )],
          body=Ξ(Λ(lambda π: π.w)))
 ```
 
@@ -3217,7 +3217,7 @@ def LET(
     _ = [setattr(E1.ϕ, p[0], EVAL(p[1], π))
          for p in pairs]
     ρ = EVAL(body, E1)
-    return ρ 
+    return ρ
 ```
 
 ### Examples:
@@ -3226,38 +3226,38 @@ def LET(
 Test depth 0; embedded $\Lambda$ is a thunk (no parameters):
 
 ```python
-LET([], 
+LET([],
     Ξ(Λ(lambda π: print(43 * 42))))
 ```
 
 Test depth 1; embedded `Procedure` takes one argument, supplied as a `Var` in the environment of the `LET`:
 
 ```python
-LET([('z', 42)], 
+LET([('z', 42)],
     Ξ(ΓΠ.square, [Var('z')]))
 ```
 
 Test depth 2; embedded `Procedure` receives an environment with bindings for the local variables:
 
 ```python
-LET([('z', 42), 
-     ('y', 43)], 
+LET([('z', 42),
+     ('y', 43)],
     Ξ(Λ(lambda π: ECHO('π', π).z * π.y)))
 ```
 
 Depth 2 with external invocation / evaluation; body -- return value -- of the `LET` is an un-called `Procedure`. The `Procedure` is evaluated, but not called, to propagate the environment, before it is returned:
 
 ```python
-LET([('z', 42), 
-     ('y', 43)], 
+LET([('z', 42),
+     ('y', 43)],
     Λ(lambda π: π.z * π.y))()
 ```
 
 Reversed; order does not matter in `LET`:
 
 ```python
-LET([('y', 42), 
-     ('z', 43)], 
+LET([('y', 42),
+     ('z', 43)],
     Ξ(Λ(lambda π: π.z * π.y)))
 ```
 
@@ -3265,7 +3265,7 @@ With applications as values for local variables, the inner `y` is evaluated in t
 
 ```python
 DEFINE('y', 0)
-LET([('y', 42), 
+LET([('y', 42),
      ('z', Ξ(Λ(lambda π: π.y + 1)))],  # Outer y = 0, not inner y = 42
     Ξ(Λ(lambda π: print(π.z * π.y))))  # Inner y = 42 * inner z = 1
 ```
@@ -3274,7 +3274,7 @@ Order does not matter:
 
 ```python
 LET([('z', Ξ(Λ(lambda π: π.y + 1))),  # Outer y = 0, not inner y = 42
-     ('y', 42)], 
+     ('y', 42)],
     Ξ(Λ(lambda π: print(π.z * π.y)))) # Inner y = 42 * inner z = 1
 ```
 
@@ -3282,7 +3282,7 @@ Print the environment to check that all symbols are bound in it:
 
 ```python
 LET([('z', Ξ(Λ(lambda π: π.y + 1))),  # Outer y = 0, not inner y = 42
-     ('y', 42)], 
+     ('y', 42)],
     Ξ(Λ(lambda π: print(ECHO('π', π).z * π.y)))) # Inner y = 42 * inner z = 1
 ```
 
@@ -3312,7 +3312,7 @@ The free variable `x` in the $\lambda$ below is looked up in the local environme
 First, delete `x` again, just in case, so we can check that it does not get bound accidentally.
 
 ```python
-try: 
+try:
     del ΓΠ.ϕ.x
 except:
     pass
@@ -3380,10 +3380,10 @@ Dictionaries, with free variables:
 ```python
 LET_STAR([
     ('forty_two', 42),
-    ('x', Ξ(Λ(lambda π: {'π.forty_two': π.forty_two, 
+    ('x', Ξ(Λ(lambda π: {'π.forty_two': π.forty_two,
                          'forty-three': π.forty_two + 1}))),
     ('y', 3)],
-   Ξ(Λ(lambda π: [π.x['π.forty_two'], 
+   Ξ(Λ(lambda π: [π.x['π.forty_two'],
                   π.x['forty-three']] * π.y)))
 ```
 
@@ -3414,7 +3414,7 @@ def LETREC(
         π: Environment = ΓΠ
 ) -> Any:
     if len(pairs) == 0:
-        ρ = EVAL(body, π)  
+        ρ = EVAL(body, π)
         return ρ
     E1 = Environment(lambda: None, π)
     for p in pairs:
@@ -3431,10 +3431,10 @@ def LETREC(
 Factorial, familiar by now, accesses itself through the patched environment; `fact` is a free variable in the body of `fact`:
 
 ```python
-LETREC([('fact', 
-         Λ(lambda π: 
+LETREC([('fact',
+         Λ(lambda π:
            (π.a
-            if π.m <= 0 
+            if π.m <= 0
             else π.fact(π.m - 1, π.m * π.a)),
            ['m', 'a']))],
        Ξ(Λ(lambda π: π.fact(6, 1))))
@@ -3443,9 +3443,9 @@ LETREC([('fact',
 Here is a version that fails if the patching is not done correctly:
 
 ```python
-Λ(lambda πo: 
-  LETREC([('fact', 
-           Λ(lambda π: 
+Λ(lambda πo:
+  LETREC([('fact',
+           Λ(lambda π:
              (π.a
               if π.m <= π.m0  # <~~~ Watch out!
               else π.fact(π.m - 1, π.m * π.a)),
@@ -3458,9 +3458,9 @@ Here is a version that fails if the patching is not done correctly:
 Now fully parameterized:
 
 ```python
-Λ(lambda πo: 
-  LETREC([('fact', 
-           Λ(lambda π: 
+Λ(lambda πo:
+  LETREC([('fact',
+           Λ(lambda π:
              (π.a
               if π.m <= π.m0  # <~~~ Watch out!
               else π.fact(π.m - 1, π.m * π.a)),
@@ -3473,10 +3473,10 @@ Now fully parameterized:
 The final application $\Xi$ is necessary to actually evaluate the final $\Lambda$, lest it be simply returned unevaluated:
 
 ```python
-LETREC([('fact', 
-         Λ(lambda π: 
+LETREC([('fact',
+         Λ(lambda π:
            (π.a
-            if π.m <= 0 
+            if π.m <= 0
             else π.fact(π.m - 1, π.m * π.a)),
            ['m', 'a']))],
        Λ(lambda π: π.fact(6, 1)))
@@ -3485,10 +3485,10 @@ LETREC([('fact',
 But we can evaluate it:
 
 ```python
-LETREC([('fact', 
-         Λ(lambda π: 
+LETREC([('fact',
+         Λ(lambda π:
            (π.a
-            if π.m <= 0 
+            if π.m <= 0
             else π.fact(π.m - 1, π.m * π.a)),
            ['m', 'a']))],
        Λ(lambda π: π.fact(6, 1)))()  # <~~~ extra evaluation!
@@ -3497,13 +3497,13 @@ LETREC([('fact',
 One can unroll the final application into formal parameters and actual arguments:
 
 ```python
-LETREC([('fact', 
-         Λ(lambda π: 
+LETREC([('fact',
+         Λ(lambda π:
            (π.a
-            if π.m <= 0 
+            if π.m <= 0
             else π.fact(π.m - 1, π.m * π.a)),
            ['m', 'a']))],
-       Ξ(Λ(lambda π: π.fact(π.n, π.b), 
+       Ξ(Λ(lambda π: π.fact(π.n, π.b),
            ['n', 'b']),  # <~~~ formal parameters
          [6, 1]))  # <~~~ actual arguments
 ```
@@ -3538,9 +3538,9 @@ The following example is [borrowed from the Racket documentation](https://docs.r
 
 ```python
 LETREC([('is_even',
-         Λ(lambda π: True if π.n == 0 else (not π.is_odd(π.n)), 
+         Λ(lambda π: True if π.n == 0 else (not π.is_odd(π.n)),
            ['n'])),
-        ('is_odd', 
+        ('is_odd',
          Λ(lambda π: π.n != 0 and π.is_even(abs(π.n) - 1),
            ['n']))],
       Ξ(Λ(lambda π: (
@@ -3608,7 +3608,7 @@ with wtak():
 #### Functional Instrumented Tak
 
 
-Here is a functional flavoring of the instrumentation, not requiring "non-local" control 
+Here is a functional flavoring of the instrumentation, not requiring "non-local" control
 
 ```python
 def itak(c, x, y, z):
@@ -3722,7 +3722,7 @@ DEFINE('tak',
 ΓΠ.ΥN(ΓΠ.tak, ['xt', 'yt', 'zt'])(18, 12, 6)
 ```
 
-Too slow: 
+Too slow:
 
 ```python
 # ΓΠ.Υ3(ΓΠ.tak)(28, 20, 12)
@@ -3735,8 +3735,8 @@ Too slow:
 
 ```python
 def LABELS(
-        binding_pairs: List[Tuple[str, Any]], 
-        body: Application, 
+        binding_pairs: List[Tuple[str, Any]],
+        body: Application,
         π: Environment = ΓΠ
 ) -> Any:
     for pair in binding_pairs:
@@ -3752,9 +3752,9 @@ Our old friend, factorial:
 
 ```python
 LABELS([('fact_iter_nom',
-        Λ(lambda π: 
-        (π.a 
-         if π.m <= 0 
+        Λ(lambda π:
+        (π.a
+         if π.m <= 0
          else π.fact_iter_nom(π.m - 1, π.a * π.m)),
        ['m', 'a']))],
       Ξ(Λ(lambda π: π.fact_iter_nom(6, 1))))
@@ -3763,10 +3763,10 @@ LABELS([('fact_iter_nom',
 Test monkey patching again:
 
 ```python
-Λ(lambda πo: 
+Λ(lambda πo:
   LABELS([('fact_iter_nom',
-           Λ(lambda π: 
-             (π.a 
+           Λ(lambda π:
+             (π.a
               if π.m <= π.m0  # <~~~ Watch out!
               else π.fact_iter_nom(π.m - 1, π.a * π.m)),
              ['m', 'a']))],
@@ -3786,7 +3786,7 @@ Here is the specification of `DO` from Steele's paper, without further explanati
      (<var2> <init2> <step2>)
      ...
      (<varN> <initN> <stepN>))
-    (<pred> <value>) 
+    (<pred> <value>)
     <optional body>)
 <!-- #endraw -->
 
@@ -3998,10 +3998,10 @@ DEFINE('γ2', 42)
 ```
 
 ```python
-DEFINE("plus_int_int", 
-       Λ(lambda π: 
-         ECHO('+ii:a', π.a) + ECHO('+ii:b', π.b), 
-         ['a', 'b']), 
+DEFINE("plus_int_int",
+       Λ(lambda π:
+         ECHO('+ii:a', π.a) + ECHO('+ii:b', π.b),
+         ['a', 'b']),
        π_integer_bin_ops)
 
 # P.FIII = (int, int) -> int
