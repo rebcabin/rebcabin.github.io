@@ -195,12 +195,12 @@ from typing import Dict, List, Any
 Parameters = List[str]  # type synonym; positional, ordered arguments only
 
 
-def APPLY(proc: "Procedure",  # <~~~ in quotes because it's not defined yet.
-          args: List["Expression"] | None,
-          π: Environment = ΓΠ) -> Any:  # defaults to global
-    """forward reference; will be corrected. Needed to
-    spec Procedure."""
-    ECHO("APPLY.args", args)  # Just print, for now.
+# def APPLY(proc: "Procedure",  # <~~~ in quotes because it's not defined yet.
+#           args: List["Expression"] | None,
+#           π: Environment = ΓΠ) -> Any:  # defaults to global
+#     """forward reference; will be corrected. Needed to
+#     spec Procedure."""
+#     ECHO("APPLY.args", args)  # Just print, for now.
 
 
 @dataclass

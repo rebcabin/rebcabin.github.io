@@ -16,6 +16,6 @@
 
 ## Algebraic Imperative Semantics, or, Lambda the Pynultimate Imperative
 
-- [Jupytext Notebook](https://github.com/rebcabin/rebcabin.github.io/blob/main/AlgImperSem008.ipynb)
+- [Jupytext Notebook](https://github.com/rebcabin/rebcabin.github.io/blob/main/AlgImperSem009.ipynb)
 
-- [Jupytext Markdown](https://github.com/rebcabin/rebcabin.github.io/blob/main/AlgImperSem008.md)
+- [Jupytext Markdown](https://github.com/rebcabin/rebcabin.github.io/blob/main/AlgImperSem009.md)
