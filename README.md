@@ -4,7 +4,7 @@
 
 The objective of Mathematics is to produce theorems, stated generally as possible. 
 
-The objective of Applied Mathematics is to produce examples from theorems.
+The objective of Applied Mathematics is to produce examples from theorems. Sometimes, the examples are general enough to be, themselves, theorems.
 
 - There is a big overlap of Mathematics and Applied Mathematics. Examples often lead to new theorems, and vice versa.
 
@@ -12,9 +12,9 @@ The objective of Physics is to do calculations that predict phenomena. Physics u
 
 The objective of Engineering is to buld things. Engineering uses Physics to design things.
 
-Both Physics and Engineering lean hard on Applied Mathematics. 
-
 Stated differently, Mathematics uses axioms to produce equations. Physics uses equations and machines to produce knowledge about the physical world. Engineering uses equations and knowledge about the physical world to produce machines. 
+
+Both Physics and Engineering lean hard on Applied Mathematics. 
 
 - Old joke: "If you know what you're doing, it ain't Science; if you don't know what you're doing, it ain't Engineering."
 
