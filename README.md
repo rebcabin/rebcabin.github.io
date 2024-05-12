@@ -39,3 +39,9 @@ There is another middle ground: Mathematical Physics. The objective is to produc
 - [Jupytext Notebook](https://github.com/rebcabin/rebcabin.github.io/blob/main/AlgImperSem009.ipynb)
 
 - [Jupytext Markdown](https://github.com/rebcabin/rebcabin.github.io/blob/main/AlgImperSem009.md)
+
+## Links
+
+The following links are to problems that I find perticularly interesting by other people in Engineering, Physics, Mathematics, and General Computing.
+
+https://www.johndcook.com/blog/expert-hipaa-deidentification/
