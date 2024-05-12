@@ -44,4 +44,4 @@ There is another middle ground: Mathematical Physics. The objective is to produc
 
 The following links are to problems that I find perticularly interesting by other people in Engineering, Physics, Mathematics, and General Computing.
 
-https://www.johndcook.com/blog/expert-hipaa-deidentification/
+- [John D. Cook's Latest](https://www.johndcook.com/blog/expert-hipaa-deidentification/)
