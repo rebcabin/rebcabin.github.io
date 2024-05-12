@@ -20,6 +20,12 @@ Stated differently, Mathematics uses axioms to produce equations. Physics uses e
 
 There is another middle ground: Mathematical Physics. The objective is to produce theorems in the corners of Mathematics most relevant to Physics, to produce more Mathematical knowledge. Calculation is seldom the objective of Mathematical Physics. It might be better called Physical Mathematics, but that sounds weird.
 
+## My Contributions to the Wolfram Community
+
+I've been a connoisseur of Mathematica since 1982, long before it was a product. It was called SMP back then. I borrowed it from a Caltech professor to check my calculations of GPS clock corrections. I realized, then, that it was an extraordinary programming language on top of being a great calculational tool. I was right! It's stood the test of time and presaged many of the great advantages of functional programming by decades. Notably absent from Mathematica is native object-oriented programming (OOP). Far from being a deficit, in my opinion, it's a strong demonstration that OOP really isn't necessary. Sure, there are many nice things in OOP, best being data abstraction and interfaces, but it's easy to do those in functional style. Nevertheless, I use Mathematica _routinely_ to design and debug code that I eventually write in C, Python, or Clojure for real-world deployment or for sharing with others.
+
+[My "Staff-Pick" Notebooks](https://community.wolfram.com/web/bcbeckman/home?p_p_id=user_WAR_userportlet&p_p_lifecycle=0&p_p_state=normal&p_p_mode=view&p_p_col_id=column-1&p_p_col_count=1&tabs1=Profile)
+
 ## How to Square the Square Root of a Function
 
 - [Jupytext Notebook](https://github.com/rebcabin/rebcabin.github.io/blob/main/PythonYCombinators.ipynb)
