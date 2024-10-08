@@ -646,7 +646,7 @@ This definition of _method_ hides the entire topic of object-oriented programmin
 ## Shortcut: $\Lambda$($\lambda$, params, $\pi$)
 
 
-Note: The `code` attributes of procedures are an unordered dictionary of parameters and body. The $\Lambda$ shortcut puts them in an order. $\Lambda$ expressions would be more clear if the list of parameters preceded the body, but defaulting the list to `None` would not be easy and one would have to write empty brackets `[]` in every instance of $\Lambda$. Better this way.
+Note: The `code` attribute of a procedure is an unordered dictionary of parameters and body. The $\Lambda$ shortcut puts them in an order. $\Lambda$ expressions would be more clear if the list of parameters preceded the body, but defaulting the list to `None` would not be easy and one would have to write empty brackets `[]` in every instance of $\Lambda$. Better this way.
 
 
 The example procedure above has a name, "square", bound in the global environment. "Square" is not anonymous, but the [`Procedure`](#procedure) value bound to the name "square" is anonymous.
