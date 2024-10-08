@@ -408,7 +408,7 @@ In a typical scenario, a procedure will call other procedures. The other procedu
 ```python
 def complex_from_polar(r, θ):
     from math import sin, cos
-    result = complex(cos(θ), sin(θ))
+    result = complex(r * cos(θ), r * sin(θ))
     return result
 from math import pi
 complex_from_polar(1.0, pi/4)
@@ -418,7 +418,7 @@ complex_from_polar(1.0, pi/4)
 
 ```python
 def complex_from_polar(r, θ, sin, cos):
-    result = complex(cos(θ), sin(θ))
+    result = complex(r * cos(θ), r * sin(θ))
     return result
 import math
 complex_from_polar(1.0, math.pi/4, math.sin, math.cos)
