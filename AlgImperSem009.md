@@ -548,7 +548,7 @@ By default, if the user gives a name to a Schemulator procedure, that name is bo
 The `Procedure` class below includes a `__call__` override. To test it, we need [`APPLY`](#apply). We prototype [`APPLY`](#apply) here, just printing actual arguments. [Later, in section `APPLY`](#apply), we implement the real work of binding parameters (in a fresh environment) to arguments (evaluated in an existing environment). That implementation requires [a codependent procedure, `EVAL`](#eval), which, in-turn, needs `APPLY` (see [SICP Figure 4.1](https://sarabander.github.io/sicp/html/4_002e1.xhtml#g_t4_002e1_002e1)).
 
 
-The definition of `Procedure` again illustrates codependent types. `Procedure`'s `__call__` syntax depends on `APPLY` and `APPLY` depends on `Procedure`. Python requires writing to-be-defined types in string quotes.
+The definition of `Procedure` again illustrates codependent types. `Procedure`'s `__call__` syntax depends on `APPLY` and `APPLY` depends on `Procedure`. Python (at least, this version of Python) requires writing to-be-defined types in string quotes.
 
 ```python
 from typing import Dict, List, Tuple, Any, Union
